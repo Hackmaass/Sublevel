@@ -9,7 +9,7 @@ import { Stamp } from "./ui/Marks";
 import { takeaway, tape } from "@/lib/readback";
 import { roomReadLine, useRoom } from "@/lib/room";
 import { useChain } from "@/lib/chainGame";
-import { addressUrl } from "@/lib/monad";
+import { addressUrl, isLocalChain } from "@/lib/monad";
 
 export function ResultOverlay() {
   const bout = useGame((s) => s.bout);
@@ -63,7 +63,7 @@ export function ResultOverlay() {
           </div>
           {onChain && (
             <div className="typewriter" style={{ fontSize: 14, marginTop: 8, color: "var(--paper)" }}>
-              ⛓ {ledger.length} transactions on Monad testnet · avg {ledger.length ? Math.round(ledger.reduce((a, t) => a + t.ms, 0) / ledger.length) : 0} ms to land · bout #{boutId}
+              ⛓ {ledger.length} transactions on {isLocalChain ? "a local test chain" : "Monad testnet"} · avg {ledger.length ? Math.round(ledger.reduce((a, t) => a + t.ms, 0) / ledger.length) : 0} ms to land · bout #{boutId}
               {deployment && (
                 <>
                   {" "}·{" "}

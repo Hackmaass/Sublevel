@@ -22,6 +22,9 @@ const localRpc = (() => {
 })();
 
 export const rpcUrl = localRpc;
+/** true when reads are pointed at a local node (`?rpc=`): the UI must not call that "Monad testnet" */
+export const isLocalChain = !!localRpc;
+export const chainLabel = isLocalChain ? "LOCAL TEST CHAIN" : "MONAD TESTNET";
 /** Monad's blocks are ~0.4 s: poll for receipts far faster than viem's 4 s default */
 export const publicClient = createPublicClient({ chain: monadTestnet, transport: http(localRpc), pollingInterval: 200 });
 

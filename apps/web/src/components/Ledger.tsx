@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useGame } from "@/lib/game";
 import { useChain } from "@/lib/chainGame";
-import { addressUrl, txUrl } from "@/lib/monad";
+import { addressUrl, chainLabel, txUrl } from "@/lib/monad";
 
 const panel: React.CSSProperties = {
   position: "absolute",
@@ -37,7 +37,7 @@ export function Ledger() {
   return (
     <div style={{ ...panel, top: 420, ...(big ? { height: 560, overflow: "auto", width: 560, zIndex: 70 } : {}) }}>
       <div onClick={() => setBig((b) => !b)} style={{ cursor: "pointer" }} title="click to expand">
-        <div className="stencil" style={{ fontSize: 13, letterSpacing: "0.2em", color: "var(--tape)" }}>THE LEDGER · MONAD TESTNET</div>
+        <div className="stencil" style={{ fontSize: 13, letterSpacing: "0.2em", color: "var(--tape)" }}>THE LEDGER · {chainLabel}</div>
         <div className="typewriter" style={{ fontSize: 12, color: "var(--smear)", marginBottom: 4 }}>
           {ledger.length} txs · avg {avg} ms to land{mismatch > 0 ? <span style={{ color: "var(--blood)" }}> · ⚠ chain≠engine ×{mismatch}</span> : <span style={{ color: "var(--ok)" }}> · chain = engine ✓</span>}
         </div>
