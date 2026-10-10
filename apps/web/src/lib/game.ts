@@ -53,7 +53,7 @@ export type Difficulty = "rookie" | "regular" | "veteran";
  */
 export interface ChainDriver {
   /** seal + reveal one turn through the Arena; resolves with the opponent's revealed action and the state the CONTRACT holds */
-  playTurn(before: BoutState, mine: Action, hooks: { onOppLocked(): void }): Promise<{ theirs: Action; state: BoutState }>;
+  playTurn(before: BoutState, mine: Action, hooks: { onOppLocked(): void }): Promise<{ mine: Action; theirs: Action; state: BoutState }>;
   /** Lite sudden death: bring in the last fighter (a sealed replacement, like any other move) */
   replace(state: BoutState, slot: number): Promise<BoutState>;
 }
@@ -409,7 +409,8 @@ export const useGame = create<Store>((set, get) => ({
   clearFx: (id) => set((st) => ({ fx: st.fx.filter((f) => f.id !== id) })),
 }));
 
-async function runTurn(mine: Action) {
+async function runTurn(mineChosen: Action) {
+  let mine = mineChosen;
   const token = ++runToken;
   const st = () => useGame.getState();
   const alive = () => token === runToken;
@@ -428,6 +429,7 @@ async function runTurn(mine: Action) {
         },
       });
       if (!alive()) return;
+      mine = r.mine; // after a hiccup the move that was ALREADY sealed on chain is the one that counts
       theirs = r.theirs;
       out = resolveTurn(bout0, mine, theirs); // the engine narrates (events for the animation)...
       if (encodeState(out.state).join() !== encodeState(r.state).join()) {

@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { createWalletClient, custom, encodeDeployData, formatEther, formatGwei, http, type Address, type Hex } from "viem";
+import { createWalletClient, custom, encodeDeployData, formatEther, formatGwei, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { bootstrapAbi, bootstrapBytecode } from "@sublevel/chain";
-import { EXPLORER, addressUrl, faucetUrl, monadTestnet, publicClient, rpcUrl, txUrl } from "@/lib/monad";
+import { EXPLORER, addressUrl, faucetUrl, makeTransport, monadTestnet, publicClient, txUrl } from "@/lib/monad";
 import { discoverWallets, ensureMonadTestnet, rememberWallet, rememberedWallet, walletError, type WalletInfo } from "@/lib/wallets";
 import { getGuestKey } from "@/lib/chainGame";
 
@@ -99,7 +99,7 @@ export default function Deploy() {
     try {
       const wc =
         signer.kind === "guest"
-          ? createWalletClient({ account: privateKeyToAccount(getGuestKey()), chain: monadTestnet, transport: http(rpcUrl) })
+          ? createWalletClient({ account: privateKeyToAccount(getGuestKey()), chain: monadTestnet, transport: makeTransport() })
           : createWalletClient({ account: signer.address, chain: monadTestnet, transport: custom(signer.wallet.provider) });
       const hash = await wc.deployContract({ abi: bootstrapAbi, bytecode: bootstrapBytecode, args: [full], gas } as never);
       setTxHash(hash);

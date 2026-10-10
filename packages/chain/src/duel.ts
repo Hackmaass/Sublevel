@@ -34,10 +34,16 @@ type Wal = WalletClient<Transport, Chain, Account>;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export class Actor {
-  private lastBlock = 0n;
   private lastSentAt = 0;
-  /** blocks to leave between this wallet's own transactions, and how long to wait instead on a chain that only mines on demand */
-  spacing = { blocks: 3n, fallbackMs: 2500 };
+  private nonce: number | null = null;
+  private fees: { at: number; maxFeePerGas: bigint; maxPriorityFeePerGas: bigint } | null = null;
+  /** `eth_sendRawTransactionSync` (receipt in the same call, no polling). Cleared if the RPC doesn't support it. */
+  private syncSend = true;
+  /**
+   * Gap to leave after this wallet's last receipt before it sends again. Monad: an account under 10 MON gets ONE transaction per ~3
+   * blocks (~0.4 s each). Time-based on purpose: polling the block number to measure it would multiply the RPC load.
+   */
+  spacing = { ms: 1500 };
 
   constructor(
     readonly who: "you" | "house",
@@ -51,51 +57,92 @@ export class Actor {
     return this.walletClient.account.address;
   }
 
-  /** wait until at least 3 blocks have passed since this wallet's last transaction (or 2.5 s, on a chain that mines on demand) */
   private async spaced(): Promise<void> {
-    for (;;) {
-      const waited = Date.now() - this.lastSentAt;
-      if (this.lastBlock === 0n || waited > this.spacing.fallbackMs) return;
-      const head = await this.publicClient.getBlockNumber();
-      if (head >= this.lastBlock + this.spacing.blocks) return;
-      await sleep(120);
+    const wait = this.lastSentAt + this.spacing.ms - Date.now();
+    if (wait > 0) await sleep(wait);
+  }
+
+  /** this wallet's next nonce, tracked locally (a lagging fallback RPC can't hand us a stale one); refetched after any failure */
+  private async nextNonce(): Promise<number> {
+    if (this.nonce === null) this.nonce = await this.publicClient.getTransactionCount({ address: this.address, blockTag: "pending" });
+    return this.nonce++;
+  }
+
+  /** fee caps, refreshed at most every 20 s (Monad charges the actual price, so a generous cap costs nothing extra) */
+  private async feeCaps(): Promise<{ maxFeePerGas: bigint; maxPriorityFeePerGas: bigint }> {
+    if (!this.fees || Date.now() - this.fees.at > 20_000) {
+      const f = await this.publicClient.estimateFeesPerGas();
+      this.fees = { at: Date.now(), maxFeePerGas: (f.maxFeePerGas * 3n) / 2n, maxPriorityFeePerGas: f.maxPriorityFeePerGas };
+    }
+    return this.fees;
+  }
+
+  private async finish(label: string, hash: Hex | null, receipt: { status: string; blockNumber: bigint; transactionHash: Hex }, t0: number): Promise<void> {
+    this.lastSentAt = Date.now();
+    this.onTx({ who: this.who, label, hash: hash ?? receipt.transactionHash, block: receipt.blockNumber, ms: Date.now() - t0 });
+    if (receipt.status !== "success") throw new Error(`${label} reverted on chain`);
+  }
+
+  /** the send itself: sync when the RPC supports it, otherwise send + wait for the receipt (slow polling) */
+  private async dispatch(label: string, send: { sync: () => Promise<{ status: string; blockNumber: bigint; transactionHash: Hex }>; plain: () => Promise<Hex> }): Promise<void> {
+    const t0 = Date.now();
+    try {
+      if (this.syncSend) {
+        try {
+          const rc = await send.sync();
+          return await this.finish(label, null, rc, t0);
+        } catch (e) {
+          const m = String((e as { message?: string; shortMessage?: string }).message ?? e) + String((e as { details?: string }).details ?? "");
+          if (!/not (found|supported|exist)|unsupported|unknown method|-32601|does not exist/i.test(m)) throw e;
+          this.syncSend = false; // this RPC has no sync send: use the plain path from now on
+        }
+      }
+      const hash = await send.plain();
+      const rc = await this.publicClient.waitForTransactionReceipt({ hash, pollingInterval: 500, timeout: 60_000 });
+      await this.finish(label, hash, rc, t0);
+    } catch (e) {
+      this.nonce = null; // anything unexpected: re-read the nonce next time
+      throw e;
     }
   }
 
-  /** one contract call: estimate, send, wait for the receipt, log it. Returns the simulated return value. */
-  async call<T = unknown>(label: string, req: { address: Address; abi: readonly unknown[]; functionName: string; args?: readonly unknown[]; value?: bigint }): Promise<T> {
+  /**
+   * One contract call: estimate gas (a revert surfaces here with its reason, before any gas is spent), send, log.
+   * `result: true` also runs a simulation first to return the call's return value (setup calls only: it costs an extra read).
+   */
+  async call<T = unknown>(label: string, req: { address: Address; abi: readonly unknown[]; functionName: string; args?: readonly unknown[]; value?: bigint }, opts: { result?: boolean } = {}): Promise<T> {
     await this.spaced();
     const base = { account: this.walletClient.account, address: req.address, abi: req.abi, functionName: req.functionName, args: req.args ?? [], value: req.value } as never;
-    const sim = await this.publicClient.simulateContract(base); // a revert surfaces here with its reason, before any gas is spent
+    let result: unknown;
+    if (opts.result) result = ((await this.publicClient.simulateContract(base)) as { result: unknown }).result;
     const est = await this.publicClient.estimateContractGas(base);
     const gas = est + est / 7n; // Monad charges the limit: keep the buffer small
-    const t0 = Date.now();
-    const hash = await this.walletClient.writeContract({ ...(sim as { request: object }).request, gas } as never);
-    this.lastSentAt = Date.now();
-    const rc = await this.publicClient.waitForTransactionReceipt({ hash, pollingInterval: 200 });
-    this.lastBlock = rc.blockNumber;
-    this.onTx({ who: this.who, label, hash, block: rc.blockNumber, ms: Date.now() - t0 });
-    if (rc.status !== "success") throw new Error(`${label} reverted on chain`);
-    return (sim as { result: T }).result;
+    const [fees, nonce] = await Promise.all([this.feeCaps(), this.nextNonce()]);
+    const tx = { ...(base as object), gas, nonce, ...fees } as never;
+    await this.dispatch(label, {
+      sync: () => (this.walletClient as unknown as { writeContractSync: (a: never) => Promise<{ status: string; blockNumber: bigint; transactionHash: Hex }> }).writeContractSync(tx),
+      plain: () => this.walletClient.writeContract(tx),
+    });
+    return result as T;
   }
 
   /** plain MON transfer (gas is always 21,000) */
   async transfer(label: string, to: Address, value: bigint): Promise<void> {
     await this.spaced();
-    const t0 = Date.now();
-    const hash = await this.walletClient.sendTransaction({ to, value, gas: 21000n });
-    this.lastSentAt = Date.now();
-    const rc = await this.publicClient.waitForTransactionReceipt({ hash, pollingInterval: 200 });
-    this.lastBlock = rc.blockNumber;
-    this.onTx({ who: this.who, label, hash, block: rc.blockNumber, ms: Date.now() - t0 });
-    if (rc.status !== "success") throw new Error(`${label} reverted on chain`);
+    const [fees, nonce] = await Promise.all([this.feeCaps(), this.nextNonce()]);
+    const tx = { to, value, gas: 21000n, nonce, ...fees } as never;
+    await this.dispatch(label, {
+      sync: () => (this.walletClient as unknown as { sendTransactionSync: (a: never) => Promise<{ status: string; blockNumber: bigint; transactionHash: Hex }> }).sendTransactionSync(tx),
+      plain: () => this.walletClient.sendTransaction(tx),
+    });
   }
 
   /**
    * A Lite pool for this wallet: claim the free starter cards (2 fighters + 1 trick, once per wallet) and register them.
-   * `remembered` is a pool id from an earlier session; it is reused if it still exists and is idle.
+   * Resumable: `remembered` is a pool id from an earlier session (reused if it still exists and is idle), `onPool` is told the id the moment
+   * it exists, and if the starter cards were claimed but the pool was never registered (a flaky network cut setup short) they are re-found.
    */
-  async ensureLitePool(presets: { a: number; b: number; trick: number }, remembered?: bigint): Promise<bigint> {
+  async ensureLitePool(presets: { a: number; b: number; trick: number }, remembered?: bigint, onPool?: (id: bigint) => void): Promise<bigint> {
     if (remembered !== undefined) {
       try {
         const info = (await this.publicClient.readContract({ address: this.addrs.armory, abi: armoryAbi, functionName: "poolInfo", args: [remembered] })) as readonly [Address, number, number, boolean, boolean];
@@ -105,9 +152,31 @@ export class Actor {
       }
     }
     const claimed = (await this.publicClient.readContract({ address: this.addrs.cards, abi: cardsAbi, functionName: "starterClaimed", args: [this.address] })) as boolean;
-    if (claimed) throw new Error("This wallet already used its free starter cards and its remembered pool is gone — reset the guest wallet.");
-    const [f0, f1, t0] = await this.call<readonly [bigint, bigint, bigint]>("claim starter cards", { address: this.addrs.cards, abi: cardsAbi, functionName: "claimStarter", args: [presets.a, presets.b, presets.trick] });
-    return this.call<bigint>("register Lite pool", { address: this.addrs.armory, abi: armoryAbi, functionName: "register", args: [0, [f0, f1, t0]] });
+    let ids: [bigint, bigint, bigint];
+    if (!claimed) {
+      const r = await this.call<readonly [bigint, bigint, bigint]>("claim starter cards", { address: this.addrs.cards, abi: cardsAbi, functionName: "claimStarter", args: [presets.a, presets.b, presets.trick] }, { result: true });
+      ids = [r[0], r[1], r[2]];
+    } else {
+      ids = await this.findStarterCards();
+    }
+    const pool = await this.call<bigint>("register Lite pool", { address: this.addrs.armory, abi: armoryAbi, functionName: "register", args: [0, ids] }, { result: true });
+    onPool?.(pool);
+    return pool;
+  }
+
+  /** after a half-finished setup: this wallet's unlocked cards, as [fighter, fighter, trick] */
+  private async findStarterCards(): Promise<[bigint, bigint, bigint]> {
+    const owned = (await this.publicClient.readContract({ address: this.addrs.cards, abi: cardsAbi, functionName: "cardsOf", args: [this.address, 0n, 40n] })) as readonly bigint[];
+    const fighters: bigint[] = [];
+    const tricks: bigint[] = [];
+    for (const id of owned) {
+      const locked = (await this.publicClient.readContract({ address: this.addrs.cards, abi: cardsAbi, functionName: "locked", args: [id] })) as boolean;
+      if (locked) continue;
+      const c = (await this.publicClient.readContract({ address: this.addrs.cards, abi: cardsAbi, functionName: "cardData", args: [id] })) as { kind: number };
+      (c.kind === 0 ? fighters : tricks).push(id);
+    }
+    if (fighters.length < 2 || tricks.length < 1) throw new Error("This guest wallet's cards are all in use. Use \"forget this guest wallet\" and start again.");
+    return [fighters[0]!, fighters[1]!, tricks[0]!];
   }
 }
 
@@ -164,7 +233,7 @@ export async function houseLoop(opts: { seat: Seat; side: 0 | 1; actor: Actor; r
       opts.onError?.(e);
       await sleep(600);
     }
-    await sleep(300); // be kind to the public RPC: ~3 reads a second per seat
+    await sleep(800); // be kind to the public RPC: ~1 read a second per seat
   }
 }
 
@@ -216,15 +285,17 @@ export async function startDuel(o: {
   youPresets: { a: number; b: number; trick: number };
   housePresets: { a: number; b: number; trick: number };
   remembered?: { you?: bigint; house?: bigint };
+  /** told each pool id the moment it exists, so an interrupted setup can resume */
+  onPool?: (who: "you" | "house", id: bigint) => void;
   step?: (s: string) => void;
 }): Promise<Duel> {
   const step = o.step ?? (() => {});
   step("Your guest wallet claims its free starter cards");
-  const poolYou = await o.you.ensureLitePool(o.youPresets, o.remembered?.you);
+  const poolYou = await o.you.ensureLitePool(o.youPresets, o.remembered?.you, (id) => o.onPool?.("you", id));
   step("The house fighter claims its cards");
-  const poolHouse = await o.house.ensureLitePool(o.housePresets, o.remembered?.house);
+  const poolHouse = await o.house.ensureLitePool(o.housePresets, o.remembered?.house, (id) => o.onPool?.("house", id));
   step("You open a challenge");
-  const boutId = await o.you.call<bigint>("open challenge", { address: o.you.addrs.arena, abi: arenaAbi, functionName: "createChallenge", args: [0, poolYou] });
+  const boutId = await o.you.call<bigint>("open challenge", { address: o.you.addrs.arena, abi: arenaAbi, functionName: "createChallenge", args: [0, poolYou] }, { result: true });
   step("The house accepts");
   await o.house.call("accept challenge", { address: o.house.addrs.arena, abi: arenaAbi, functionName: "acceptChallenge", args: [boutId, poolHouse] });
   step("Deriving your secret move salts from one local signature");
@@ -239,7 +310,7 @@ export async function waitFor(seat: Seat, ok: (m: BoutMeta) => boolean, timeoutM
     const m = await seat.meta();
     if (ok(m) || m.phase === "Over" || m.phase === "Void" || m.phase === "Cancelled") return m;
     if (Date.now() - t0 > timeoutMs) throw new Error("timed out waiting for the other side");
-    await sleep(260);
+    await sleep(700);
   }
 }
 

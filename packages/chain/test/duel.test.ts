@@ -56,7 +56,7 @@ describe("guest-wallet duel", () => {
       const acct = privateKeyToAccount(generatePrivateKey());
       await test.setBalance({ address: acct.address, value: 10n ** 20n });
       const a = new Actor(who, pub, createWalletClient({ account: acct, chain, transport }), addrs, (t) => ledger.push(t));
-      a.spacing = { blocks: 0n, fallbackMs: 0 }; // anvil only mines on demand: no spacing needed
+      a.spacing = { ms: 0 }; // anvil only mines on demand: no spacing needed
       return a;
     };
     const [you, house] = [await mk("you"), await mk("house")];

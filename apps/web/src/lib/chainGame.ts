@@ -9,12 +9,12 @@
  * about the project ever asks for, stores or sends a user's real wallet key.
  */
 import { create } from "zustand";
-import { createWalletClient, custom, formatEther, http, parseEther, type Address, type Hex } from "viem";
+import { createWalletClient, custom, formatEther, parseEther, type Address, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { Actor, TAG, houseLoop, playLead, presetName, readRevealedAction, startDuel, waitFor, type Duel, type TxLog } from "@sublevel/chain";
 import type { Action, BoutState } from "@sublevel/engine";
 import { DEPLOYMENT, type Deployment } from "./deployments";
-import { monadTestnet, publicClient, rpcUrl } from "./monad";
+import { isLocalChain, makeTransport, monadTestnet, publicClient } from "./monad";
 import { ensureMonadTestnet, walletError, type WalletInfo } from "./wallets";
 import { useGame, type ChainDriver } from "./game";
 
@@ -52,7 +52,8 @@ function loadKey(name: string): Hex {
 export const getGuestKey = (): Hex => loadKey(KEY_GUEST);
 
 export function getDeployment(): Deployment | null {
-  if (DEPLOYMENT) return DEPLOYMENT;
+  // pointed at a LOCAL node (`?rpc=`, for testing): the baked-in testnet addresses would not exist there, so a local deployment wins
+  if (DEPLOYMENT && !isLocalChain) return DEPLOYMENT;
   try {
     const raw = localStorage.getItem("sublevel.deployment"); // written by the /deploy page on the machine that deployed
     const d = raw ? (JSON.parse(raw) as Deployment) : null;
@@ -160,7 +161,7 @@ export const useChain = create<ChainState>((set, get) => ({
     try {
       const addrs = { arena: d.arena, armory: d.armory, cards: d.cards };
       const mk = (who: "you" | "house", key: Hex) =>
-        new Actor(who, publicClient, createWalletClient({ account: privateKeyToAccount(key), chain: monadTestnet, transport: http(rpcUrl) }), addrs, (t) => set((st) => ({ ledger: [...st.ledger, t] })));
+        new Actor(who, publicClient, createWalletClient({ account: privateKeyToAccount(key), chain: monadTestnet, transport: makeTransport() }), addrs, (t) => set((st) => ({ ledger: [...st.ledger, t] })));
       const you = mk("you", loadKey(KEY_GUEST));
       const house = mk("house", loadKey(KEY_HOUSE));
 
@@ -175,7 +176,15 @@ export const useChain = create<ChainState>((set, get) => ({
         const v = ls(k);
         return v && /^\d+$/.test(v) ? BigInt(v) : undefined;
       };
-      duel = await startDuel({ you, house, youPresets: YOU, housePresets: HOUSE, remembered: { you: remembered(KEY_POOL_YOU), house: remembered(KEY_POOL_HOUSE) }, step });
+      duel = await startDuel({
+        you,
+        house,
+        youPresets: YOU,
+        housePresets: HOUSE,
+        remembered: { you: remembered(KEY_POOL_YOU), house: remembered(KEY_POOL_HOUSE) },
+        onPool: (who, id) => ls(who === "you" ? KEY_POOL_YOU : KEY_POOL_HOUSE, String(id)), // resumable: remember a pool the moment it exists
+        step,
+      });
       ls(KEY_POOL_YOU, String(duel.poolYou));
       ls(KEY_POOL_HOUSE, String(duel.poolHouse));
       set({ boutId: String(duel.boutId) });
@@ -188,19 +197,28 @@ export const useChain = create<ChainState>((set, get) => ({
       const view = await myDuel.you.view();
       if (!view) throw new Error("the bout did not start");
 
+      // RESUMABLE: if a network hiccup interrupts a turn, retrying must reuse the move already sealed on chain (a different move would
+      // fail the reveal and forfeit) and skip the steps already done.
+      const sealed = new Map<number, Action>();
       const driver: ChainDriver = {
-        async playTurn(before, mine, hooks) {
+        async playTurn(before, chosen, hooks) {
           const seat = myDuel.you;
           const turn = before.turn;
-          await seat.commit(TAG.ACTION, turn, mine);
+          const mine = sealed.get(turn) ?? chosen;
+          const m0 = await seat.meta();
+          if (m0.phase === "TurnCommit" && !m0.committed[0]) {
+            sealed.set(turn, mine);
+            await seat.commit(TAG.ACTION, turn, mine);
+          }
           await waitFor(seat, (m) => m.phase !== "TurnCommit"); // the house has sealed too
           hooks.onOppLocked();
-          await seat.reveal(TAG.ACTION, turn, mine);
+          const m1 = await seat.meta();
+          if (m1.phase === "TurnReveal" && !m1.revealed[0]) await seat.reveal(TAG.ACTION, turn, mine);
           await waitFor(seat, (m) => m.phase !== "TurnReveal"); // the turn has resolved
           const theirs = await readRevealedAction(publicClient, d.arena, myDuel.boutId, 1);
           const v = await seat.view();
           if (!v) throw new Error("no state after the turn");
-          return { theirs: (theirs ?? 2) as Action, state: v.state };
+          return { mine, theirs: (theirs ?? 2) as Action, state: v.state };
         },
         async replace(state: BoutState, slot: number) {
           const seat = myDuel.you;
@@ -222,7 +240,8 @@ export const useChain = create<ChainState>((set, get) => ({
       set({ setupOpen: false });
       useGame.getState().startChainMatch(view.state, names, seeds, driver);
     } catch (e) {
-      set({ error: (e as { shortMessage?: string; message?: string }).shortMessage ?? (e as Error).message });
+      const raw = (e as { shortMessage?: string; message?: string }).shortMessage ?? (e as Error).message;
+      set({ error: /429|rate.?limit|too many requests/i.test(raw) ? "The public Monad RPC is rate-limiting this connection. Wait about 20 seconds and press START again: setup resumes where it stopped." : raw });
     } finally {
       set({ running: false });
       void get().refresh();

@@ -33,10 +33,10 @@ export function ChainSetup() {
   }, [open]);
 
   useEffect(() => {
-    if (!open) return;
-    const id = setInterval(() => void refresh(), 3000);
+    if (!open || running) return; // no balance polling while a duel is being set up: every request counts against the shared RPC limit
+    const id = setInterval(() => void refresh(), 10_000);
     return () => clearInterval(id);
-  }, [open, refresh]);
+  }, [open, running, refresh]);
 
   const enough = balance !== null && balance >= GUEST_NEEDS;
   const mon = (v: bigint | null) => (v === null ? "…" : `${Number(formatEther(v)).toFixed(2)} MON`);
