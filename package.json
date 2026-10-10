@@ -1,0 +1,14 @@
+{
+  "name": "sublevel",
+  "private": true,
+  "version": "0.0.1",
+  "description": "SUBLEVEL — a fight-club card duel on Monad",
+  "packageManager": "pnpm@12.6.0",
+  "scripts": {
+    "engine:test": "pnpm --filter @sublevel/engine test",
+    "engine:sim": "pnpm --filter @sublevel/engine sim",
+    "web:dev": "pnpm --filter web dev",
+    "web:build": "pnpm --filter web build",
+    "web:demo": "pnpm --filter web demo"
+  }
+}

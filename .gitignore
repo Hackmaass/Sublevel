@@ -1,0 +1,26 @@
+node_modules/
+.next/
+out/
+dist/
+cache/
+broadcast/
+tools/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+coverage/
+.vercel/
+playwright-report/
+test-results/
+shots/
+
+# private working notes: analysis of the projects that inspired this one (not part of the submission)
+docs/reference/
+
+# tool state / third-party agent skills (not ours, not part of the project)
+.agents/
+.claude/
+.monskills
+skills-lock.json
