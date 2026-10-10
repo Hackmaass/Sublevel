@@ -1,0 +1,30 @@
+{
+ "names": [
+  "bias",
+  "koDiff",
+  "hpTotalDiff",
+  "activeHpDiff",
+  "gritDiff",
+  "myGrit",
+  "oppGrit",
+  "advantage",
+  "tricksDiff",
+  "potential",
+  "turnFrac",
+  "sudden"
+ ],
+ "w": [
+  0,
+  1.78809,
+  2.13902,
+  1.14149,
+  -0.02547,
+  -0.01274,
+  0.01274,
+  0.33999,
+  -0.1821,
+  0.36354,
+  0,
+  0
+ ]
+}
