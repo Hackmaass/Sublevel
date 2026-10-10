@@ -12,14 +12,14 @@
 
 | Time | Say | Show |
 |---|---|---|
-| 0:00 | "**SUBLEVEL** is an underground card duel on Monad where every move is secret, a contract is the referee, and a whole room can read the fight live from their phones. Repo: **github.com/Hackmaass/Sublevel**. Live at **⟨live URL⟩**, deployed on **Monad Testnet**, Arena contract **0x4e8a68…55294b**." | Title screen, QR visible |
+| 0:00 | "**SUBLEVEL** is an underground card duel on Monad where every move is secret, a contract is the referee, and a whole room can read the fight live from their phones. Repo: **github.com/Hackmaass/Sublevel**. Live at **sublevel-theta.vercel.app**, deployed on **Monad Testnet**, Arena contract **0x4e8a68…55294b**." | Title screen, QR visible |
 | 0:25 | "Two fighters seal a move at the same time. Nobody can see the other's, nobody can change theirs, and there's no server in the middle." | Press **⛓ ON-CHAIN DUEL** → START (already funded) |
 | 0:45 | "That's a real transaction on Monad for every seal and every reveal. Watch the Ledger: who sent it, which block, and how fast it landed. About ⟨N⟩ ms." | Match running; point at **THE LEDGER** and `chain = engine ✓` |
 | 1:25 | "The contract resolves the turn, and my TypeScript engine has to agree with it, every turn, or the screen flags it." | A reveal + hit animation |
 | 1:50 | "The room. Scan this." *(phone scan)* "They're reading the fight: what will each fighter do next? Picks are sealed, so the fighters can't use the crowd, and they're revealed a turn late. Points only: the crowd can never touch the result." | Phone join → predict → heat bars + "THE ROOM CALLED IT" |
 | 2:25 | "Why Monad: sub-second blocks turn a per-turn on-chain mind game from a minute a turn into seconds. And each card remembers: its record is written only by the Arena, so nobody can edit a career." | Result screen → open the Arena / a tx on the explorer |
 | 2:45 | "Free to play, fight-club look is the product. We'd earn from event licensing of The Room, cosmetics and sponsored belts. Never pay-to-win, no betting." | — |
-| 2:55 | "Repo **github.com/Hackmaass/Sublevel**, live **⟨live URL⟩**, Arena **⟨0x…⟩**, on Monad Testnet. Thank you." | Title screen |
+| 2:55 | "Repo **github.com/Hackmaass/Sublevel**, live **sublevel-theta.vercel.app**, Arena **⟨0x…⟩**, on Monad Testnet. Thank you." | Title screen |
 
 ## Honest answers to the questions you'll get
 - **"Is the opponent a person?"** In this demo it's a house bot with its own wallet, so nobody needs a wallet to play. A person-vs-person challenge is in the contracts (`createChallenge` / `acceptChallenge`, plus a ranked queue); the UI for that isn't built yet.

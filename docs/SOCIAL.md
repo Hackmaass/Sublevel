@@ -30,7 +30,7 @@ Cross-post the same posts on LinkedIn (the rubric accepts X **or** LinkedIn; bot
 > The contract resolves each turn, and the TypeScript engine has to agree every time.
 >
 > Arena: https://testnet.monadscan.com/address/0x4e8a6874dC1c607721191f93B76156c30355294b
-> Play: ⟨live URL⟩
+> Play: sublevel-theta.vercel.app
 > Code: github.com/Hackmaass/Sublevel
 >
 > @monad @monad_dev @geeky_kartikey
@@ -47,7 +47,7 @@ Cross-post the same posts on LinkedIn (the rubric accepts X **or** LinkedIn; bot
 ### Post 4 — final push
 > Last call: try the on-chain duel. No wallet needed: a guest wallet signs for you, so you can be in a real Monad bout in ten seconds.
 >
-> ⟨live URL⟩ · github.com/Hackmaass/Sublevel
+> sublevel-theta.vercel.app · github.com/Hackmaass/Sublevel
 > @monad @monad_dev @geeky_kartikey
 
 ---

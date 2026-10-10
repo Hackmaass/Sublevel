@@ -12,7 +12,7 @@ Built at **Monad Blitz Pune V3**.
 
 | | |
 |---|---|
-| **Live app** | __LIVE_URL__ |
+| **Live app** | **https://sublevel-theta.vercel.app** |
 | **Repository** | https://github.com/Hackmaass/Sublevel |
 | **Network** | Monad Testnet (chain id `10143`) · explorers: [Monadscan](https://testnet.monadscan.com) · [MonadVision](https://testnet.monadvision.com) |
 | **Contracts** | deployed and source-verified, see the table below |
