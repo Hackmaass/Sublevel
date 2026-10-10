@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+/* ---------- Design tokens: "Photocopy Basement" ---------- */
+:root {
+  --toner: #0b0b0c;
+  --toner-2: #141416;
+  --toner-3: #1d1d20;
+  --paper: #e9e4d8;
+  --paper-2: #d9d3c2;
+  --tape: #ff5a1f;
+  --tape-dim: #b8410f;
+  --bruise: #7a5cff;
+  --smear: #8e8a7e;
+  --chalk: #f5f1e6;
+  --blood: #c1272d;
+  --ok: #8fd18f;
+
+  --font-display: "Anton", "Impact", "Arial Narrow", sans-serif;
+  --font-stencil: "Stardos Stencil", "Anton", sans-serif;
+  --font-type: "Special Elite", "Courier New", monospace;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-marker: "Permanent Marker", "Comic Sans MS", cursive;
+}
+
+@theme inline {
+  --color-toner: var(--toner);
+  --color-paper: var(--paper);
+  --color-tape: var(--tape);
+  --color-bruise: var(--bruise);
+  --color-smear: var(--smear);
+  --color-chalk: var(--chalk);
+  --font-display: var(--font-display);
+  --font-stencil: var(--font-stencil);
+  --font-type: var(--font-type);
+  --font-mono: var(--font-mono);
+  --font-marker: var(--font-marker);
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--toner);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: var(--tape);
+  color: var(--toner);
+}
+
+/* ---------- reusable textures (pure CSS, no assets) ---------- */
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  opacity: 0.11;
+  mix-blend-mode: overlay;
+}
+
+.halftone {
+  background-image: radial-gradient(circle at 25% 25%, rgba(0, 0, 0, 0.55) 1.1px, transparent 1.6px);
+  background-size: 6px 6px;
+}
+
+.paper {
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(ellipse at 20% 10%, rgba(255, 255, 255, 0.45), transparent 55%),
+    radial-gradient(ellipse at 90% 100%, rgba(120, 100, 60, 0.18), transparent 60%);
+  color: var(--toner);
+}
+
+.stencil {
+  font-family: var(--font-stencil);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.display {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.typewriter {
+  font-family: var(--font-type);
+}
+
+.marker {
+  font-family: var(--font-marker);
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  7% { opacity: 0.82; }
+  9% { opacity: 1; }
+  41% { opacity: 0.94; }
+  43% { opacity: 0.78; }
+  45% { opacity: 1; }
+  78% { opacity: 0.9; }
+}
+.flicker { animation: flicker 6s infinite steps(1, end); }
+
+@media (prefers-reduced-motion: reduce) {
+  .flicker { animation: none; }
+}
