@@ -12,20 +12,23 @@ Built at **Monad Blitz Pune V3**.
 
 | | |
 |---|---|
-| **Live app** | _to be added after the hosted deploy_ |
+| **Live app** | __LIVE_URL__ |
 | **Repository** | https://github.com/Hackmaass/Sublevel |
-| **Network** | Monad Testnet (chain id `10143`) |
-| **Contracts** | _addresses to be added after the testnet deploy (table below)_ |
+| **Network** | Monad Testnet (chain id `10143`) · explorers: [Monadscan](https://testnet.monadscan.com) · [MonadVision](https://testnet.monadvision.com) |
+| **Contracts** | deployed and source-verified, see the table below |
+| **Deployment** | one transaction, [`0x0f12d1db…3d7873`](https://testnet.monadscan.com/tx/0x0f12d1dbfa0f2c0a47bbaecdc5ad07cdccfe6f147376da80cc1c1326363d7873), block 69,789,792 |
 
-### Deployed contracts (Monad Testnet)
+### Deployed contracts (Monad Testnet, chain `10143`)
 
 | Contract | Address | Role |
 |---|---|---|
-| Arena | _to be added_ | commit → reveal bouts, timeouts, forfeits, settlement |
-| Cards | _to be added_ | ERC-721 fighters and tricks; records written only by the Arena |
-| Armory | _to be added_ | pools of cards, scoped session keys |
-| Ladder | _to be added_ | Elo ratings and the Belt (soulbound to the reign) |
-| Bootstrap | _to be added_ | deployed the four above in one transaction, then holds no power |
+| **Arena** | [`0x4e8a6874dC1c607721191f93B76156c30355294b`](https://testnet.monadscan.com/address/0x4e8a6874dC1c607721191f93B76156c30355294b) | commit → reveal bouts, timeouts, forfeits, settlement |
+| Cards | [`0xb04f5d938e92563FC48aC9acF7fc367527BC9dcD`](https://testnet.monadscan.com/address/0xb04f5d938e92563FC48aC9acF7fc367527BC9dcD) | ERC-721 fighters and tricks; records written only by the Arena |
+| Armory | [`0xff8425F545Cf2EB51B0604F227ba842d52109453`](https://testnet.monadscan.com/address/0xff8425F545Cf2EB51B0604F227ba842d52109453) | pools of cards, scoped session keys |
+| Ladder | [`0x327b300ac0EFaF463a5363Fd3f4d9F5b55525788`](https://testnet.monadscan.com/address/0x327b300ac0EFaF463a5363Fd3f4d9F5b55525788) | Elo ratings and the Belt (soulbound to the reign) |
+| Bootstrap | [`0x45fCCe56c139b28655A3b7083f98e41C6c36E04d`](https://testnet.monadscan.com/address/0x45fCCe56c139b28655A3b7083f98e41C6c36E04d) | created the four above in one transaction and wired them, then holds no power |
+
+All five are **source-verified** on both explorers (Monadscan: "Pass – Verified"; MonadVision: verified). The Arena, Cards, Armory and Ladder addresses were read back from the Bootstrap contract's own getters, and each contract's `arena()` / `ladder()` / `armory()` pointers were checked on chain. Deployment cost: 17,844,533 gas (Monad charges the gas *limit*) ≈ 1.82 MON at ~102 gwei.
 
 ## The game in a minute
 

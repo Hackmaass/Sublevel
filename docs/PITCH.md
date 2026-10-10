@@ -12,7 +12,7 @@
 
 | Time | Say | Show |
 |---|---|---|
-| 0:00 | "**SUBLEVEL** is an underground card duel on Monad where every move is secret, a contract is the referee, and a whole room can read the fight live from their phones. Repo: **github.com/Hackmaass/Sublevel**. Live at **⟨live URL⟩**, deployed on **Monad Testnet**, Arena contract **⟨0x…⟩**." | Title screen, QR visible |
+| 0:00 | "**SUBLEVEL** is an underground card duel on Monad where every move is secret, a contract is the referee, and a whole room can read the fight live from their phones. Repo: **github.com/Hackmaass/Sublevel**. Live at **⟨live URL⟩**, deployed on **Monad Testnet**, Arena contract **0x4e8a68…55294b**." | Title screen, QR visible |
 | 0:25 | "Two fighters seal a move at the same time. Nobody can see the other's, nobody can change theirs, and there's no server in the middle." | Press **⛓ ON-CHAIN DUEL** → START (already funded) |
 | 0:45 | "That's a real transaction on Monad for every seal and every reveal. Watch the Ledger: who sent it, which block, and how fast it landed. About ⟨N⟩ ms." | Match running; point at **THE LEDGER** and `chain = engine ✓` |
 | 1:25 | "The contract resolves the turn, and my TypeScript engine has to agree with it, every turn, or the screen flags it." | A reveal + hit animation |

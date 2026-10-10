@@ -29,7 +29,7 @@ Cross-post the same posts on LinkedIn (the rubric accepts X **or** LinkedIn; bot
 >
 > The contract resolves each turn, and the TypeScript engine has to agree every time.
 >
-> Arena: ⟨explorer link⟩
+> Arena: https://testnet.monadscan.com/address/0x4e8a6874dC1c607721191f93B76156c30355294b
 > Play: ⟨live URL⟩
 > Code: github.com/Hackmaass/Sublevel
 >
