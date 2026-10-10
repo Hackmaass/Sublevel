@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import QRCode from "qrcode";
 import { useGame } from "@/lib/game";
 import { useRoom } from "@/lib/room";
-import { RELAY_ENABLED } from "@/lib/roomBridge";
+import { P2P_ENABLED, RELAY_ENABLED } from "@/lib/roomBridge";
 import { useViewport } from "@/lib/viewport";
 
 /** The address a phone should open: the page's own origin, or — when this screen was opened as `localhost` — this machine's network address. */
@@ -13,7 +13,7 @@ export function useJoinUrl(): { url: string | null; host: string | null } {
   const code = useRoom((s) => s.code);
   const [base, setBase] = useState<string | null>(null);
   useEffect(() => {
-    if (!RELAY_ENABLED) return; // the hosted build has no relay, so there is nothing to point a phone at
+    if (!RELAY_ENABLED && !P2P_ENABLED) return; // neither a relay nor a peer link: nothing to point a phone at
     let alive = true;
     const { hostname, origin, port } = window.location;
     const forced = new URLSearchParams(window.location.search).get("lan"); // ?lan=192.168.1.20 when the automatic guess is the wrong adapter

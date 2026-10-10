@@ -12,10 +12,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Prediction } from "@sublevel/engine";
 import { useGame } from "./game";
 import { useRoom } from "./room";
+import { hostPeer, joinPeer, type HostLink, type PhoneLink } from "./p2p";
 
 export const ROOM_CHANNEL = "sublevel-room";
 /** false in the hosted (serverless) build: no QR relay there — same-browser spectator windows still work */
 export const RELAY_ENABLED = process.env.NEXT_PUBLIC_RELAY !== "0";
+/** true in the hosted build: phones connect to the projector peer-to-peer (WebRTC) instead of through the relay */
+export const P2P_ENABLED = process.env.NEXT_PUBLIC_P2P === "1";
 
 export interface RoomSnapshot {
   live: boolean;
@@ -109,6 +112,34 @@ export function startProjectorBridge(): () => void {
     };
   }
 
+  /* ---- peer-to-peer (real phones on the hosted build) ---- */
+  let link: HostLink | null = null;
+  const connectP2P = () => {
+    if (!P2P_ENABLED) return;
+    link?.destroy();
+    link = hostPeer(code, {
+      onMessage: (m, reply) => {
+        const msg = m as ToProjector;
+        if (!msg || typeof msg !== "object") return;
+        if (msg.t === "hello") reply({ t: "state", snap: snapshot() } satisfies ToPhone);
+        else handle(msg, reply as (m: ToPhone) => void);
+      },
+      onConnect: (reply) => reply({ t: "state", snap: snapshot() } satisfies ToPhone),
+      onOnline: (online) => !dead && useRoom.setState({ relay: online ? "online" : "offline" }),
+      onCodeTaken: () => {
+        if (dead) return;
+        code = randomCode();
+        try {
+          sessionStorage.setItem("sublevel.room.code", code);
+        } catch {
+          /* ignore */
+        }
+        useRoom.setState({ code });
+        connectP2P();
+      },
+    });
+  };
+
   /* ---- relay (real phones) ---- */
   let es: EventSource | null = null;
   const connectHost = () => {
@@ -151,12 +182,15 @@ export function startProjectorBridge(): () => void {
     if (pending || dead) return;
     pending = setTimeout(() => {
       pending = null;
-      ch?.postMessage({ t: "state", snap: snapshot() } satisfies ToPhone);
+      const snap = snapshot();
+      ch?.postMessage({ t: "state", snap } satisfies ToPhone);
+      link?.broadcast({ t: "state", snap } satisfies ToPhone);
       void publish();
     }, 150);
   }
 
   connectHost();
+  connectP2P();
   const subs = [useRoom.subscribe(push), useGame.subscribe(push)];
   const hb = setInterval(push, 1500);
   push();
@@ -166,6 +200,7 @@ export function startProjectorBridge(): () => void {
     clearInterval(hb);
     if (pending) clearTimeout(pending);
     es?.close();
+    link?.destroy();
     ch?.close();
   };
 }
@@ -216,8 +251,28 @@ export function useRemoteRoom() {
     setSnap(s);
   }, []);
 
+  const peerLink = useRef<PhoneLink | null>(null);
+  const acks = useRef(new Map<string, (ok: boolean) => void>());
+
   const post = useCallback(
     async (body: object): Promise<{ ok: boolean; why?: string }> => {
+      if (P2P_ENABLED) {
+        const b = body as { t: string; id: string; turn?: number };
+        if (!peerLink.current?.send(body)) return { ok: false, why: "not connected to the big screen yet" };
+        if (b.t !== "pick") return { ok: true };
+        // the projector answers a pick with an ack for that turn
+        return new Promise((resolve) => {
+          const key = `${b.id}:${b.turn}`;
+          const timer = setTimeout(() => {
+            acks.current.delete(key);
+            resolve({ ok: false, why: "no answer from the big screen" });
+          }, 5000);
+          acks.current.set(key, (ok) => {
+            clearTimeout(timer);
+            resolve(ok ? { ok: true } : { ok: false, why: "too late" });
+          });
+        });
+      }
       try {
         const res = await fetch(`/api/room/${code}/msg`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
         return (await res.json()) as { ok: boolean; why?: string };
@@ -228,10 +283,35 @@ export function useRemoteRoom() {
     [code],
   );
 
-  // --- relay mode: SSE in, POST out ---
+  // --- hosted build: a direct WebRTC link to the projector ---
   const ready = !!id && !!name;
   useEffect(() => {
-    if (!code || !ready) return;
+    if (!P2P_ENABLED || !code || !ready) return;
+    const l = joinPeer(
+      code,
+      (m) => {
+        const msg = m as ToPhone;
+        if (msg?.t === "state") take(msg.snap);
+        else if (msg?.t === "ack") acks.current.get(`${msg.id}:${msg.turn}`)?.(msg.ok);
+      },
+      (c) => {
+        setConnected(c);
+        if (c) {
+          l.send({ t: "join", id, name: nameRef.current } satisfies ToProjector);
+          l.send({ t: "hello" } satisfies ToProjector);
+        }
+      },
+    );
+    peerLink.current = l;
+    return () => {
+      peerLink.current = null;
+      l.destroy();
+    };
+  }, [code, id, ready, take]);
+
+  // --- relay mode: SSE in, POST out ---
+  useEffect(() => {
+    if (P2P_ENABLED || !code || !ready) return;
     const es = new EventSource(`/api/room/${code}/events`);
     es.onopen = () => {
       setConnected(true);
