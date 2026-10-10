@@ -46,5 +46,15 @@
     "claimTimeout_ranked": 800000,
     "reveal_resolving_ranked_end": 3000000
   },
-  "note": "reveal_* limits depend on who reveals second; the client doesn't know in advance, so use reveal_resolving for the second-to-act side if it can tell, else the larger of the two. RANKED: every resolving reveal in a ranked bout must use reveal_resolving_ranked_end — the client can't know which reveal ends the bout, and a too-small limit makes the final reveal revert (the player then times out and takes a rated forfeit). 839k EVM gas measured for a KO ending (resolve + career records + rating + Belt mint); x~3 headroom for Monad's dearer cold storage; re-measure on testnet."
+  "note": "reveal_* limits depend on who reveals second; the client doesn't know in advance, so use reveal_resolving for the second-to-act side if it can tell, else the larger of the two. RANKED: every resolving reveal in a ranked bout must use reveal_resolving_ranked_end — the client can't know which reveal ends the bout, and a too-small limit makes the final reveal revert (the player then times out and takes a rated forfeit). 839k EVM gas measured for a KO ending (resolve + career records + rating + Belt mint); x~3 headroom for Monad's dearer cold storage; re-measure on testnet. LESSON (real testnet): the reveal that lands second also resolves the turn (2-5x the gas). A client that estimates gas just before the other seat's reveal lands sizes it for the cheap path and runs out of gas (mined, reverted, charged the full limit). packages/chain/src/duel.ts now floors reveals (400k, lead 650k), lets the human reveal first, and retries an out-of-gas revert with 3x the estimate.",
+  "measuredOnMonadTestnet": {
+    "_source": "real transactions on Monad testnet (chain 10143), Arena 0x4e8a…294b, 2026-10-10; gas limits that SUCCEEDED (Monad charges the limit); estimates were ~1.14x lower",
+    "createChallenge": 171374,
+    "acceptChallenge": 149294,
+    "commit": "58k-91k",
+    "reveal_first": "65k-153k",
+    "reveal_second_resolving": "345k-373k",
+    "reveal_that_ends_the_bout": "~800k",
+    "reveal_out_of_gas_when_sized_for_the_cheap_path": "152k-172k (2 reverted on chain)"
+  }
 }

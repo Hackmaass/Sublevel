@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPublicClient, createTestClient, createWalletClient, defineChain, http, type Address } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { LITE, legalActions, mulberry32 } from "@sublevel/engine";
-import { Actor, bootstrapAbi, bootstrapBytecode, houseLoop, playLead, playTurn, readRevealedAction, startDuel, type TxLog } from "../src";
+import { Actor, bootstrapAbi, bootstrapBytecode, cardsAbi, houseLoop, playLead, playTurn, readRevealedAction, startDuel, type TxLog } from "../src";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../../..");
@@ -90,4 +90,40 @@ describe("guest-wallet duel", () => {
     expect(ledger.some((t) => t.who === "house" && t.label === "reveal move")).toBe(true);
     expect(ledger.every((t) => t.block > 0n && t.ms >= 0)).toBe(true);
   }, 180000);
+
+  /** helper shared by the tests below */
+  const mkActor = async (who: "you" | "house", ledger: TxLog[] = []) => {
+    const acct = privateKeyToAccount(generatePrivateKey());
+    await test.setBalance({ address: acct.address, value: 10n ** 20n });
+    const a = new Actor(who, pub, createWalletClient({ account: acct, chain, transport }), addrs, (t) => ledger.push(t));
+    a.spacing = { ms: 0 };
+    return a;
+  };
+
+  it("recovers by itself when a transaction runs out of gas (the real-testnet failure: gas sized for the cheap path)", async () => {
+    const ledger: TxLog[] = [];
+    const a = await mkActor("you", ledger);
+    a.gasScale = 0.3; // far too little: the first attempt must run out of gas
+    await a.call("claim starter cards", { address: addrs.cards, abi: cardsAbi, functionName: "claimStarter", args: [0, 3, 0] }, { result: true });
+    const attempts = ledger.filter((t) => t.label === "claim starter cards");
+    expect(attempts.length).toBe(2); // one that ran out of gas, one retried with room to spare
+    expect(await pub.readContract({ address: addrs.cards, abi: cardsAbi, functionName: "starterClaimed", args: [a.address] })).toBe(true);
+  }, 60000);
+
+  it("clears an abandoned bout so its cards come back, and says 'busy' until the deadline passes", async () => {
+    const [you, house] = [await mkActor("you"), await mkActor("house")];
+    const duel = await startDuel({ you, house, youPresets: { a: 0, b: 3, trick: 0 }, housePresets: { a: 6, b: 4, trick: 3 } });
+    // the tab is closed right here: nobody ever commits a lead
+    const early = await you.releaseIfStuck(duel.poolYou);
+    expect(early.state).toBe("busy");
+    expect(early.waitSeconds).toBeGreaterThan(0);
+    await test.increaseTime({ seconds: 120 });
+    await test.mine({ blocks: 1 });
+    expect((await you.releaseIfStuck(duel.poolYou)).state).toBe("released");
+    expect((await you.releaseIfStuck(duel.poolYou)).state).toBe("free");
+    // and the same pool can host a brand-new duel
+    const again = await startDuel({ you, house, youPresets: { a: 0, b: 3, trick: 0 }, housePresets: { a: 6, b: 4, trick: 3 }, remembered: { you: duel.poolYou, house: duel.poolHouse } });
+    expect(again.poolYou).toBe(duel.poolYou);
+  }, 90000);
+
 });

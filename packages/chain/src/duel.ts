@@ -44,6 +44,8 @@ export class Actor {
    * blocks (~0.4 s each). Time-based on purpose: polling the block number to measure it would multiply the RPC load.
    */
   spacing = { ms: 1500 };
+  /** gas limit = estimate × this (Monad charges the limit, so keep it modest; floors and the retry below cover the rest) */
+  gasScale = 1.3;
 
   constructor(
     readonly who: "you" | "house",
@@ -77,20 +79,25 @@ export class Actor {
     return this.fees;
   }
 
-  private async finish(label: string, hash: Hex | null, receipt: { status: string; blockNumber: bigint; transactionHash: Hex }, t0: number): Promise<void> {
+  private async finish(label: string, hash: Hex | null, receipt: { status: string; blockNumber: bigint; transactionHash: Hex; gasUsed?: bigint }, t0: number, gas?: bigint): Promise<void> {
     this.lastSentAt = Date.now();
     this.onTx({ who: this.who, label, hash: hash ?? receipt.transactionHash, block: receipt.blockNumber, ms: Date.now() - t0 });
-    if (receipt.status !== "success") throw new Error(`${label} reverted on chain`);
+    if (receipt.status !== "success") {
+      // On Monad a transaction that runs out of gas is mined, reverted, and charged for its whole limit. Typical cause: gas was estimated for
+      // the cheap path (first to reveal) but this transaction landed second and had to resolve the turn. State is unchanged, so retry bigger.
+      if (gas !== undefined && receipt.gasUsed !== undefined && receipt.gasUsed >= gas - 1n) throw new OutOfGas(label);
+      throw new Error(`${label} reverted on chain`);
+    }
   }
 
   /** the send itself: sync when the RPC supports it, otherwise send + wait for the receipt (slow polling) */
-  private async dispatch(label: string, send: { sync: () => Promise<{ status: string; blockNumber: bigint; transactionHash: Hex }>; plain: () => Promise<Hex> }): Promise<void> {
+  private async dispatch(label: string, gas: bigint | undefined, send: { sync: () => Promise<{ status: string; blockNumber: bigint; transactionHash: Hex; gasUsed?: bigint }>; plain: () => Promise<Hex> }): Promise<void> {
     const t0 = Date.now();
     try {
       if (this.syncSend) {
         try {
           const rc = await send.sync();
-          return await this.finish(label, null, rc, t0);
+          return await this.finish(label, null, rc, t0, gas);
         } catch (e) {
           const m = String((e as { message?: string; shortMessage?: string }).message ?? e) + String((e as { details?: string }).details ?? "");
           if (!/not (found|supported|exist)|unsupported|unknown method|-32601|does not exist/i.test(m)) throw e;
@@ -99,9 +106,9 @@ export class Actor {
       }
       const hash = await send.plain();
       const rc = await this.publicClient.waitForTransactionReceipt({ hash, pollingInterval: 500, timeout: 60_000 });
-      await this.finish(label, hash, rc, t0);
+      await this.finish(label, hash, rc, t0, gas);
     } catch (e) {
-      this.nonce = null; // anything unexpected: re-read the nonce next time
+      if (!(e instanceof OutOfGas)) this.nonce = null; // a mined (even reverted) tx used its nonce; anything else: re-read it next time
       throw e;
     }
   }
@@ -110,20 +117,29 @@ export class Actor {
    * One contract call: estimate gas (a revert surfaces here with its reason, before any gas is spent), send, log.
    * `result: true` also runs a simulation first to return the call's return value (setup calls only: it costs an extra read).
    */
-  async call<T = unknown>(label: string, req: { address: Address; abi: readonly unknown[]; functionName: string; args?: readonly unknown[]; value?: bigint }, opts: { result?: boolean } = {}): Promise<T> {
+  async call<T = unknown>(label: string, req: { address: Address; abi: readonly unknown[]; functionName: string; args?: readonly unknown[]; value?: bigint }, opts: { result?: boolean; minGas?: bigint } = {}): Promise<T> {
     await this.spaced();
     const base = { account: this.walletClient.account, address: req.address, abi: req.abi, functionName: req.functionName, args: req.args ?? [], value: req.value } as never;
     let result: unknown;
     if (opts.result) result = ((await this.publicClient.simulateContract(base)) as { result: unknown }).result;
     const est = await this.publicClient.estimateContractGas(base);
-    const gas = est + est / 7n; // Monad charges the limit: keep the buffer small
-    const [fees, nonce] = await Promise.all([this.feeCaps(), this.nextNonce()]);
-    const tx = { ...(base as object), gas, nonce, ...fees } as never;
-    await this.dispatch(label, {
-      sync: () => (this.walletClient as unknown as { writeContractSync: (a: never) => Promise<{ status: string; blockNumber: bigint; transactionHash: Hex }> }).writeContractSync(tx),
-      plain: () => this.walletClient.writeContract(tx),
-    });
-    return result as T;
+    let gas = BigInt(Math.ceil(Number(est) * this.gasScale));
+    if (opts.minGas !== undefined && gas < opts.minGas) gas = opts.minGas;
+    for (let attempt = 0; ; attempt++) {
+      const [fees, nonce] = await Promise.all([this.feeCaps(), this.nextNonce()]);
+      const tx = { ...(base as object), gas, nonce, ...fees } as never;
+      try {
+        await this.dispatch(label, gas, {
+          sync: () => (this.walletClient as unknown as { writeContractSync: (a: never) => Promise<{ status: string; blockNumber: bigint; transactionHash: Hex; gasUsed?: bigint }> }).writeContractSync(tx),
+          plain: () => this.walletClient.writeContract(tx),
+        });
+        return result as T;
+      } catch (e) {
+        if (!(e instanceof OutOfGas) || attempt >= 1) throw e;
+        gas = est * 3n > gas * 3n ? est * 3n : gas * 3n; // out of gas, state unchanged: go again with real room to spare
+        await sleep(this.spacing.ms);
+      }
+    }
   }
 
   /** plain MON transfer (gas is always 21,000) */
@@ -131,7 +147,7 @@ export class Actor {
     await this.spaced();
     const [fees, nonce] = await Promise.all([this.feeCaps(), this.nextNonce()]);
     const tx = { to, value, gas: 21000n, nonce, ...fees } as never;
-    await this.dispatch(label, {
+    await this.dispatch(label, 21000n, {
       sync: () => (this.walletClient as unknown as { sendTransactionSync: (a: never) => Promise<{ status: string; blockNumber: bigint; transactionHash: Hex }> }).sendTransactionSync(tx),
       plain: () => this.walletClient.sendTransaction(tx),
     });
@@ -164,6 +180,29 @@ export class Actor {
     return pool;
   }
 
+  /**
+   * A pool is "in a bout" until the bout ends. If an earlier duel was abandoned (tab closed, network died) its cards stay locked until the
+   * 90 s phase deadline passes and anyone calls `claimTimeout`. This does that when it can, and says how long to wait when it can't.
+   */
+  async releaseIfStuck(poolId: bigint): Promise<{ state: "free" | "released" | "busy"; waitSeconds?: number }> {
+    const info = (await this.publicClient.readContract({ address: this.addrs.armory, abi: armoryAbi, functionName: "poolInfo", args: [poolId] })) as readonly [Address, number, number, boolean, boolean];
+    if (!info[4]) return { state: "free" };
+    const next = (await this.publicClient.readContract({ address: this.addrs.arena, abi: arenaAbi, functionName: "nextBout" })) as bigint;
+    for (let id = next - 1n; id >= 0n && id >= next - 10n; id--) {
+      const b = (await this.publicClient.readContract({ address: this.addrs.arena, abi: arenaAbi, functionName: "getBout", args: [id] })) as readonly [readonly Address[], readonly bigint[], number, number, bigint, ...unknown[]];
+      const phase = b[3];
+      const mine = b[1][0] === poolId || b[1][1] === poolId;
+      const active = (phase >= 2 && phase <= 7) || phase === 11;
+      if (!mine || !active) continue;
+      const chainNow = Number((await this.publicClient.getBlock()).timestamp); // the CHAIN's clock decides deadlines, not this computer's
+      const left = Number(b[4]) - chainNow;
+      if (left > 0) return { state: "busy", waitSeconds: left + 3 };
+      await this.call("clear an abandoned bout", { address: this.addrs.arena, abi: arenaAbi, functionName: "claimTimeout", args: [id] });
+      return { state: "released" };
+    }
+    return { state: "free" };
+  }
+
   /** after a half-finished setup: this wallet's unlocked cards, as [fighter, fighter, trick] */
   private async findStarterCards(): Promise<[bigint, bigint, bigint]> {
     const owned = (await this.publicClient.readContract({ address: this.addrs.cards, abi: cardsAbi, functionName: "cardsOf", args: [this.address, 0n, 40n] })) as readonly bigint[];
@@ -180,12 +219,26 @@ export class Actor {
   }
 }
 
+class OutOfGas extends Error {
+  constructor(label: string) {
+    super(`${label} ran out of gas`);
+  }
+}
+
 /** the house bot: plays the seat it is given with the equilibrium bot until the bout is over */
 export async function houseLoop(opts: { seat: Seat; side: 0 | 1; actor: Actor; rng?: Rng; stop?: () => boolean; onError?: (e: unknown) => void }): Promise<void> {
   const { seat, side, stop } = opts;
   const rng = opts.rng ?? mulberry32(Date.now() & 0xffffff);
   const chosen = new Map<string, number>();
   const sealed = (tag: number, turn: number) => `${tag}:${turn}`;
+  // Let the human reveal FIRST: the second reveal also resolves the turn (2-5x the gas), and a seat that estimated its gas just before the
+  // other's reveal landed would run out of gas. If the human is slow, the house goes after a grace period (its estimate is then accurate).
+  const since = new Map<string, number>();
+  const waited = (phase: string): boolean => {
+    const t = since.get(phase) ?? Date.now();
+    since.set(phase, t);
+    return Date.now() - t > 9000;
+  };
   for (let idle = 0; ; ) {
     if (stop?.()) return;
     let meta: BoutMeta;
@@ -197,10 +250,11 @@ export async function houseLoop(opts: { seat: Seat; side: 0 | 1; actor: Actor; r
       continue;
     }
     if (meta.phase === "Over" || meta.phase === "Void" || meta.phase === "Cancelled") return;
+    for (const k of [...since.keys()]) if (k !== meta.phase) since.delete(k);
     try {
       let acted = true;
       if (meta.phase === "LeadCommit" && !meta.committed[side]) await seat.commitLead(0, 0);
-      else if (meta.phase === "LeadReveal" && !meta.revealed[side]) await seat.revealLead(0, 0);
+      else if (meta.phase === "LeadReveal" && !meta.revealed[side] && (meta.revealed[1 - side] || waited(meta.phase))) await seat.revealLead(0, 0);
       else if (meta.phase === "TurnCommit" && !meta.committed[side]) {
         const v = await seat.view();
         if (!v) throw new Error("no state yet");
@@ -208,7 +262,7 @@ export async function houseLoop(opts: { seat: Seat; side: 0 | 1; actor: Actor; r
         const a = chosen.get(sealed(TAG.ACTION, turn)) ?? eqBot(v.state, side, rng);
         chosen.set(sealed(TAG.ACTION, turn), a);
         await seat.commit(TAG.ACTION, turn, a);
-      } else if (meta.phase === "TurnReveal" && !meta.revealed[side]) {
+      } else if (meta.phase === "TurnReveal" && !meta.revealed[side] && (meta.revealed[1 - side] || waited(meta.phase))) {
         const v = await seat.view();
         if (!v) throw new Error("no state yet");
         const turn = v.state.turn;
@@ -247,6 +301,12 @@ export const presetName = (i: number): string => PRESETS[i]?.name ?? `Fighter ${
 /* ------------------------------------------------------------------------------------------------------------------ */
 import { secretMessage, deriveSecrets } from "./secrets";
 
+/**
+ * Gas floors from real Monad testnet transactions. A reveal that lands second resolves the turn: seen 345k-373k, and the reveal that ends a
+ * bout (KO + career records) needed ~700k. The estimate can be stale when two seats send at once, so these floors keep the limit above it.
+ */
+const GAS_FLOOR: Record<string, bigint> = { commit: 110_000n, reveal: 400_000n, revealLead: 650_000n, revealOpen: 600_000n, openCards: 700_000n };
+
 const ARENA_LABELS: Record<string, string> = { commit: "seal move", reveal: "reveal move", revealLead: "reveal lead", revealOpen: "reveal + open card", openCards: "open cards" };
 
 /** a Seat whose every transaction runs through `actor` (so it is estimated, spaced and logged) */
@@ -259,7 +319,7 @@ export function seatFor(actor: Actor, boutId: bigint, side: 0 | 1, secrets: Retu
     side,
     secrets,
     onSend: async (fn, args) => {
-      await actor.call(ARENA_LABELS[fn] ?? fn, { address: actor.addrs.arena, abi: arenaAbi, functionName: fn, args });
+      await actor.call(ARENA_LABELS[fn] ?? fn, { address: actor.addrs.arena, abi: arenaAbi, functionName: fn, args }, { minGas: GAS_FLOOR[fn] });
     },
   });
 }
@@ -290,6 +350,12 @@ export async function startDuel(o: {
   step?: (s: string) => void;
 }): Promise<Duel> {
   const step = o.step ?? (() => {});
+  for (const [who, actor, pool] of [["your", o.you, o.remembered?.you], ["the house", o.house, o.remembered?.house]] as const) {
+    if (pool === undefined) continue;
+    const r = await actor.releaseIfStuck(pool);
+    if (r.state === "busy") throw new Error(`A previous duel is still open on chain (${who} cards are locked in it). It can be cleared in about ${r.waitSeconds} seconds: wait, then press START again.`);
+    if (r.state === "released") step(`Cleared an abandoned earlier duel (${who} cards are free again)`);
+  }
   step("Your guest wallet claims its free starter cards");
   const poolYou = await o.you.ensureLitePool(o.youPresets, o.remembered?.you, (id) => o.onPool?.("you", id));
   step("The house fighter claims its cards");

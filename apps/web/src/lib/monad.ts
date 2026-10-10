@@ -28,7 +28,7 @@ export const rpcUrl = localRpc;
  * eth_call and gas estimates, shared per IP, so a venue full of teams can exhaust it). On a 429 or any failure the next one answers.
  * Set NEXT_PUBLIC_MONAD_RPC to a private endpoint (e.g. an Alchemy testnet URL) to put it first.
  */
-const PUBLIC_RPCS = ["https://testnet-rpc.monad.xyz", "https://rpc-testnet.monadinfra.com", "https://rpc.ankr.com/monad_testnet", "https://monad-testnet.drpc.org", "https://monad-testnet.api.onfinality.io/public"];
+const PUBLIC_RPCS = ["https://testnet-rpc.monad.xyz", "https://rpc.ankr.com/monad_testnet", "https://monad-testnet.drpc.org", "https://monad-testnet.api.onfinality.io/public"];
 const PRIVATE_RPC = process.env.NEXT_PUBLIC_MONAD_RPC;
 const rpcOpts = { batch: { wait: 25 }, retryCount: 2, retryDelay: 300, timeout: 12_000 } as const;
 
