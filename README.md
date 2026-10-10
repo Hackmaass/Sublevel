@@ -119,7 +119,7 @@ cd contracts && forge test        # 63 tests
 
 **Publish the source on the explorers:** `pnpm --filter @sublevel/chain verify <bootstrapAddress>` (it reads the other four addresses from the Bootstrap contract and uses the exact compiler settings of the build).
 
-**Venue mode** (a projector and phones): `pnpm web:demo` serves a production build on every network interface. Open `http://localhost:3000` on the big screen and phones that scan its QR join the Room. The phones must be able to reach the laptop (same wifi, or the laptop's hotspot). The relay keeps its rooms in one server process, so it is switched off in hosted builds.
+**Venue mode** (a projector and phones): `pnpm web:demo` serves a production build on every network interface. Open `http://localhost:3000` on the big screen and phones that scan its QR join the Room. The phones must be able to reach the laptop (same wifi, or the laptop's hotspot). On the hosted site (sublevel-theta.vercel.app) there is no server to keep a room, so phones connect to the big screen peer-to-peer over WebRTC (PeerJS's free public signalling server only introduces them); the QR works there too, and it needs both devices to reach the internet and not be on a Wi-Fi that blocks device-to-device traffic.
 
 ## How it fits together
 
