@@ -36,7 +36,7 @@ export function useJoinUrl(): { url: string | null; host: string | null } {
   return { url: base && code ? `${base}/watch?room=${code}` : null, host: base ? base.replace(/^https?:\/\//, "") : null };
 }
 
-function useQr(url: string | null): string | null {
+export function useQr(url: string | null): string | null {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     if (!url) return setSrc(null);
@@ -51,9 +51,15 @@ function useQr(url: string | null): string | null {
   return src;
 }
 
+/** how long the big, background-dimmed QR stays up the first time a match starts */
+const INTRO_MS = 12_000;
+
 /**
- * "Scan to join" for the projector: big while nobody has joined (readable across a room), gone once a phone is in.
- * Only shown while the relay answers — a QR for a server nobody can reach would be a lie.
+ * "Scan to join" for the projector.
+ *  • title screen: a small card in the corner (nothing there to get in the way);
+ *  • in a match: the first time, a big QR centred over a DIMMED screen for ~12 s (click / Esc closes it early), then it tucks away. The QR chip in
+ *    the room panel (RoomView) and the bottom-bar "qr" button bring it back.
+ * Only shown while the relay answers — a QR for a server nobody can reach would be a lie — and it closes itself once a phone has joined.
  */
 export function ScanToJoin() {
   const screen = useGame((s) => s.screen);
@@ -62,45 +68,112 @@ export function ScanToJoin() {
   const relay = useRoom((s) => s.relay);
   const code = useRoom((s) => s.code);
   const on = useRoom((s) => s.on);
+  const phones = useRoom((s) => s.spectators.some((x) => x.human));
   const vp = useViewport();
   const { url, host } = useJoinUrl();
   const qr = useQr(url);
+  const [auto, setAuto] = useState(false);
   const bigScreen = !!vp && !vp.compact && !vp.coarse;
-  const show = bigScreen && on && qrBig && relay === "online" && !!qr && !tutorial && screen !== "lobby";
+  const ready = bigScreen && on && relay === "online" && !!qr && !tutorial && screen !== "lobby";
   const title = screen === "title";
 
+  // the intro: once per browser session, the first time a match is on screen with the relay up and nobody has joined yet
+  useEffect(() => {
+    if (!ready || title || phones) return;
+    let seen = false;
+    try {
+      seen = sessionStorage.getItem("sublevel.qr.intro") === "1";
+      if (!seen) sessionStorage.setItem("sublevel.qr.intro", "1");
+    } catch {
+      /* storage blocked: fall through and show it once per page load */
+    }
+    if (seen) return;
+    useRoom.setState({ qrBig: true });
+    setAuto(true);
+    const id = setTimeout(() => {
+      useRoom.setState({ qrBig: false });
+      setAuto(false);
+    }, INTRO_MS);
+    return () => clearTimeout(id);
+  }, [ready, title, phones]);
+
+  const close = () => {
+    useRoom.setState({ qrBig: false });
+    setAuto(false);
+  };
+
+  useEffect(() => {
+    if (!qrBig) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [qrBig]);
+
+  const small = title;
+  const card = (
+    <>
+      <div className="stencil" style={{ fontSize: small ? 14 : 22, letterSpacing: "0.22em", color: "var(--tape)" }}>
+        SCAN TO READ THE FIGHT
+      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={qr ?? ""} alt="QR code to join the room" style={{ width: small ? 170 : 330, height: small ? 170 : 330, display: "block", margin: "10px auto 8px", imageRendering: "pixelated" }} />
+      <div className="display" style={{ fontSize: small ? 34 : 64, lineHeight: 1, letterSpacing: "0.12em", color: "var(--paper)" }}>
+        {code}
+      </div>
+      <div className="typewriter" style={{ fontSize: small ? 12 : 15, color: "var(--smear)", marginTop: 6 }}>
+        or open {host}/watch and type the code
+      </div>
+    </>
+  );
+
   return (
-    <AnimatePresence>
-      {show && (
-        <motion.div
-          key="scan"
-          initial={{ opacity: 0, scale: 0.9, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9 }}
-          style={{
-            position: "absolute",
-            zIndex: 45,
-            ...(title ? { left: 36, bottom: 215, width: 230 } : { left: "50%", marginLeft: -150, top: 640, width: 300 }),
-            padding: "10px 12px 10px",
-            background: "linear-gradient(180deg, rgba(20,20,22,0.94), rgba(11,11,12,0.92))",
-            border: "2px solid var(--tape)",
-            boxShadow: "0 10px 40px rgba(0,0,0,0.65)",
-            textAlign: "center",
-          }}
-        >
-          <div className="stencil" style={{ fontSize: title ? 14 : 18, letterSpacing: "0.22em", color: "var(--tape)" }}>
-            SCAN TO READ THE FIGHT
-          </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={qr!} alt="QR code to join the room" style={{ width: title ? 170 : 240, height: title ? 170 : 240, display: "block", margin: "8px auto 6px", imageRendering: "pixelated" }} />
-          <div className="display" style={{ fontSize: title ? 34 : 48, lineHeight: 1, letterSpacing: "0.12em", color: "var(--paper)" }}>
-            {code}
-          </div>
-          <div className="typewriter" style={{ fontSize: 12, color: "var(--smear)", marginTop: 4 }}>
-            or open {host}/watch and type the code
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <>
+      {/* title screen: a small corner card */}
+      <AnimatePresence>
+        {ready && title && !phones && (
+          <motion.div
+            key="title-scan"
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            style={{ position: "absolute", zIndex: 45, left: 36, bottom: 215, width: 230, padding: "10px 12px", background: "linear-gradient(180deg, rgba(20,20,22,0.94), rgba(11,11,12,0.92))", border: "2px solid var(--tape)", boxShadow: "0 10px 40px rgba(0,0,0,0.65)", textAlign: "center" }}
+          >
+            {card}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* in a match: big over a dimmed screen, then it tucks away */}
+      <AnimatePresence>
+        {ready && !title && qrBig && (
+          <motion.div
+            key="dim"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={close}
+            style={{ position: "absolute", inset: 0, zIndex: 90, background: "rgba(0,0,0,0.78)", display: "grid", placeItems: "center", cursor: "pointer" }}
+          >
+            <motion.div
+              initial={{ scale: 0.92, y: 16 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.3, x: 640, y: -60, opacity: 0 }} // shrinks off toward the QR chip in the room panel
+              transition={{ type: "spring", stiffness: 220, damping: 24 }}
+              style={{ width: 460, padding: "18px 22px 16px", background: "linear-gradient(180deg, rgba(20,20,22,0.98), rgba(11,11,12,0.97))", border: "3px solid var(--tape)", boxShadow: "0 30px 90px rgba(0,0,0,0.85)", textAlign: "center" }}
+            >
+              {card}
+              <div className="typewriter" style={{ fontSize: 12, color: "var(--smear)", marginTop: 12 }}>
+                {auto ? "this tucks itself away in a moment" : "click anywhere or press Esc to close"} · find it again in the QR chip on the right, or the “qr” button
+              </div>
+              {auto && (
+                <div style={{ height: 4, background: "rgba(245,241,230,0.15)", marginTop: 8 }}>
+                  <motion.div initial={{ width: "100%" }} animate={{ width: "0%" }} transition={{ duration: INTRO_MS / 1000, ease: "linear" }} style={{ height: "100%", background: "var(--tape)" }} />
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

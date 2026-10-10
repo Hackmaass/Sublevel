@@ -61,7 +61,7 @@ interface RoomState {
   code: string;
   /** whether the relay (the Next server) answered the last publish */
   relay: "unknown" | "online" | "offline";
-  /** the big "scan to join" QR; it steps aside once a phone has joined */
+  /** the big, background-dimmed "scan to join" QR is open (a first-time intro, or on demand); it closes once a phone has joined */
   qrBig: boolean;
   toggleQr(): void;
   /** bumps for every new bout, so a phone never mistakes a rematch's turn 0 for the old one */
@@ -113,7 +113,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   windowOpen: false,
   code: "",
   relay: "unknown",
-  qrBig: true,
+  qrBig: false,
   toggleQr: () => set((s) => ({ qrBig: !s.qrBig })),
   epoch: 0,
   windowTurn: 0,

@@ -7,6 +7,7 @@ import { useGame } from "@/lib/game";
 import { useRoom } from "@/lib/room";
 import { sfx } from "@/lib/sfx";
 import { useViewport } from "@/lib/viewport";
+import { useJoinUrl, useQr } from "./JoinCard";
 import { Stamp } from "./ui/Marks";
 
 const panel: React.CSSProperties = {
@@ -32,6 +33,9 @@ export function RoomView() {
   const code = useRoom((s) => s.code);
   const onChain = useGame((s) => !!s.chain);
   const vp = useViewport();
+  const relay = useRoom((s) => s.relay);
+  const { url: joinUrl } = useJoinUrl();
+  const chipQr = useQr(relay === "online" ? joinUrl : null);
 
   useEffect(() => {
     if (!roar) return;
@@ -100,15 +104,28 @@ export function RoomView() {
       {heat(1)}
 
       {/* status + phone hint */}
-      <div style={{ ...panel, right: 28, top: 420, padding: "10px 16px" }}>
-        <div className="stencil" style={{ fontSize: 13, letterSpacing: "0.22em", color: "var(--smear)" }}>
-          {house} HOUSE READERS · {phones} {phones === 1 ? "PHONE" : "PHONES"}
-        </div>
-        <div className="typewriter" style={{ fontSize: 14, marginTop: 4, color: open ? "var(--tape)" : "var(--smear)" }}>
-          {open ? `● ${locked}/${spectators.length} locked · sealed` : "○ window shut"}
-        </div>
-        <div className="typewriter" style={{ fontSize: 12, marginTop: 6, color: "var(--smear)", lineHeight: 1.3 }}>
-          house readers are bots. phones: join code <span style={{ color: "var(--paper)" }}>{code || "…"}</span>
+      <div style={{ ...panel, right: 28, top: 420, padding: "10px 16px", display: "flex", gap: 12, alignItems: "center" }}>
+        {chipQr && (
+          <button
+            onClick={() => useRoom.setState({ qrBig: true })}
+            title="show the big QR code"
+            style={{ flex: "none", width: 92, height: 92, padding: 3, background: "#f5f1e6", border: "2px solid var(--tape)", cursor: "pointer" }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={chipQr} alt="QR chip: click to enlarge" style={{ width: "100%", height: "100%", imageRendering: "pixelated", display: "block" }} />
+          </button>
+        )}
+        <div>
+          <div className="stencil" style={{ fontSize: 13, letterSpacing: "0.22em", color: "var(--smear)" }}>
+            {house} HOUSE · {phones} {phones === 1 ? "PHONE" : "PHONES"}
+          </div>
+          <div className="typewriter" style={{ fontSize: 14, marginTop: 4, color: open ? "var(--tape)" : "var(--smear)" }}>
+            {open ? `● ${locked}/${spectators.length} locked` : "○ window shut"}
+          </div>
+          <div className="typewriter" style={{ fontSize: 12, marginTop: 6, color: "var(--smear)", lineHeight: 1.3 }}>
+            house readers are bots. phones: join code <span style={{ color: "var(--paper)" }}>{code || "…"}</span>
+            {chipQr ? " · click the QR" : ""}
+          </div>
         </div>
       </div>
 
