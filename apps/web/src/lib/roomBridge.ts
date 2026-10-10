@@ -14,6 +14,8 @@ import { useGame } from "./game";
 import { useRoom } from "./room";
 
 export const ROOM_CHANNEL = "sublevel-room";
+/** false in the hosted (serverless) build: no QR relay there — same-browser spectator windows still work */
+export const RELAY_ENABLED = process.env.NEXT_PUBLIC_RELAY !== "0";
 
 export interface RoomSnapshot {
   live: boolean;
@@ -110,6 +112,7 @@ export function startProjectorBridge(): () => void {
   /* ---- relay (real phones) ---- */
   let es: EventSource | null = null;
   const connectHost = () => {
+    if (!RELAY_ENABLED) return;
     es?.close();
     es = new EventSource(`/api/room/${code}/host?key=${hostKey}`);
     es.addEventListener("msg", (ev) => {
@@ -121,6 +124,7 @@ export function startProjectorBridge(): () => void {
     });
   };
   const publish = async () => {
+    if (!RELAY_ENABLED) return;
     try {
       const res = await fetch(`/api/room/${code}/state`, { method: "POST", headers: { "content-type": "application/json", "x-host-key": hostKey }, body: JSON.stringify(snapshot()) });
       if (dead) return;

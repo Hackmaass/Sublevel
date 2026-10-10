@@ -10,5 +10,6 @@ Regenerated whenever a feature changes — treat them as the current look, not a
 | `03-room-projector/` | **THE ROOM** on the big screen: the window open with picks sealed (`window-open-sealed`), and the room's read of the last turn revealed one turn late (`heat-revealed`). |
 | `04-room-phone/` | The spectator phone view (same-browser mock). |
 | `05-venue-relay-qr/` | **Real phones via the relay + QR**: `01` title screen with the scan-to-join QR (it decodes to the machine's network address + room code) · `02`–`08` a phone joining, picking, getting SEALED, then its result after the reveal · `03` the QR stepping aside once a phone joined · `09` projector heat with a real phone on the leaderboard · `10`–`11` joining by typing the code. |
+| `06-deploy-page/` | The `/deploy` page: connect a wallet, see the real cost, one transaction deploys everything. **These shots are from a local test chain, not the real deployment** (addresses shown are throw-away). |
 
 Run it for real: `pnpm web:demo` (production build on every network interface, port 3000), open `http://localhost:3000` on the big screen — the QR shows the machine's network address.
