@@ -11,6 +11,8 @@ import { ChainSetup } from "@/components/ChainSetup";
 import { getDeployment, useChain } from "@/lib/chainGame";
 import { startRoom, useRoom } from "@/lib/room";
 import { startProjectorBridge } from "@/lib/roomBridge";
+import { BeltRoom, LoginModal } from "@/components/Profile";
+import { useAccount } from "@/lib/account";
 import { useEffect } from "react";
 
 export default function Home() {
@@ -20,6 +22,7 @@ export default function Home() {
     if (new URLSearchParams(window.location.search).get("room") === "0") useRoom.setState({ on: false });
     const dep = getDeployment();
     if (dep) useChain.setState({ deployment: dep }); // the on-chain duel appears only once the contracts exist
+    useAccount.getState().hydrate(); // the signed-in wallet (browser-only storage)
     const stopRoom = startRoom();
     const stopBridge = startProjectorBridge();
     return () => {
@@ -35,6 +38,8 @@ export default function Home() {
       <Manual />
       <ScanToJoin />
       <ChainSetup />
+      <BeltRoom />
+      <LoginModal />
     </Stage>
   );
 }

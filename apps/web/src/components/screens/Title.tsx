@@ -10,6 +10,7 @@ import { Stamp, Tape } from "../ui/Marks";
 import { sfx } from "@/lib/sfx";
 import { tutorialDone } from "@/lib/tutorial";
 import { useChain } from "@/lib/chainGame";
+import { ProfileChip } from "../Profile";
 
 export function Title() {
   const goLobby = useGame((s) => s.goLobby);
@@ -88,6 +89,7 @@ export function Title() {
         </div>
       </motion.div>
 
+      <ProfileChip deployed={deployed} />
       {deployed && (
         <button onClick={() => { unlockAudio(); sfx.bell(); openChain(); }} className="display" style={{ position: "absolute", right: 36, top: 30, zIndex: 30, fontSize: 36, padding: "10px 28px", background: "var(--tape)", color: "#0b0b0c", border: "none", cursor: "pointer", transform: "rotate(1.5deg)", boxShadow: "0 0 0 3px #0b0b0c, 0 0 0 6px var(--tape), 0 14px 34px rgba(255,90,31,0.4)" }}>
           ⛓ ON-CHAIN DUEL

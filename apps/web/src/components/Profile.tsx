@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { privateKeyToAccount } from "viem/accounts";
 import { short, useAccount } from "@/lib/account";
 import { FORMATS, useBelt, vacantBelt, type BeltView, type Standing } from "@/lib/belt";
-import { getDeployment, getGuestKey } from "@/lib/chainGame";
 import { addressUrl } from "@/lib/monad";
 import { unlockAudio, sfx } from "@/lib/sfx";
 import { discoverWallets, type WalletInfo } from "@/lib/wallets";
@@ -78,7 +76,10 @@ export function LoginModal() {
               {wallets === null && <div style={{ ...mono, color: "#555" }}>Looking for wallets in this browser…</div>}
               {wallets?.map((w) => (
                 <button key={w.id} onClick={() => void signIn(w)} disabled={busy} className="display" style={{ ...btn("var(--tape)", "#0b0b0c"), fontSize: 30, display: "flex", alignItems: "center", gap: 14, justifyContent: "center" }}>
-                  {w.icon && /* eslint-disable-next-line @next/next/no-img-element */ <img src={w.icon} alt="" width={30} height={30} />}
+                  {w.icon && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={w.icon} alt="" width={30} height={30} />
+                  )}
                   {busy ? "CHECK YOUR WALLET…" : `SIGN IN WITH ${w.name.toUpperCase()}`}
                 </button>
               ))}
@@ -110,7 +111,6 @@ export function BeltRoom() {
   const hide = useBelt((s) => s.hide);
   const load = useBelt((s) => s.load);
   const account = useAccount((s) => s.account);
-  const fallbackGuest = open && !guest && getDeployment() ? privateKeyToAccount(getGuestKey()).address : guest;
 
   return (
     <AnimatePresence>
@@ -137,19 +137,19 @@ export function BeltRoom() {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 30, marginTop: 18 }}>
               {FORMATS.map((f) => (
-                <BeltCard key={f.id} name={f.name} blurb={f.blurb} belt={belts.find((b) => b.format === f.id) ?? null} loading={loading} you={[fallbackGuest, account?.address]} standing={standing?.[f.id]} />
+                <BeltCard key={f.id} name={f.name} blurb={f.blurb} belt={belts.find((b) => b.format === f.id) ?? null} loading={loading} you={[guest, account?.address]} standing={standing?.[f.id]} />
               ))}
             </div>
 
             <div style={{ ...mono, marginTop: 18, fontSize: 14, color: "#2b2b2d", lineHeight: 1.5, borderTop: "2px dashed rgba(0,0,0,0.35)", paddingTop: 12 }}>
               <div>
                 <b>You fight as</b> the guest key{" "}
-                {fallbackGuest ? <a href={addressUrl(fallbackGuest)} target="_blank" rel="noreferrer" style={{ color: "#0b0b0c" }}>{short(fallbackGuest)}</a> : "…"}
+                {guest ? <a href={addressUrl(guest)} target="_blank" rel="noreferrer" style={{ color: "#0b0b0c" }}>{short(guest)}</a> : "…"}
                 {account ? <> · signed in as <b>{short(account.address)}</b> ({account.wallet}). Belts and ratings accrue to the key that fights, which today is the guest key.</> : <> · sign in with a wallet from the title screen to put a name to it.</>}
               </div>
               <div style={{ marginTop: 4 }}>
                 <b>Honest status:</b> the Ladder is deployed on Monad testnet
-                {ladder && <> (<a href={addressUrl(ladder)} target="_blank" rel="noreferrer" style={{ color: "#0b0b0c" }}>{short(ladder)}</a>)</>}, but this build has no ranked queue yet, and the on-chain duel is an unranked bout against the house bot — so it can&apos;t move a belt. Both belts stay vacant until two real fighters meet in a ranked bout.
+                {ladder && <> (<a href={addressUrl(ladder)} target="_blank" rel="noreferrer" style={{ color: "#0b0b0c" }}>{short(ladder)}</a>)</>}, but this build has no ranked queue yet, and the on-chain duel is an unranked bout against the house bot — so it can&apos;t move a belt. {belts.some((b) => b.holder) ? "A held belt was crowned by a ranked bout settled on-chain." : "Both belts stay vacant until two real fighters meet in a ranked bout."}
               </div>
             </div>
           </div>
@@ -178,7 +178,8 @@ function BeltCard({ name, blurb, belt, loading, you, standing }: { name: string;
         {held ? (
           <>
             Holder <a href={addressUrl(belt!.holder!)} target="_blank" rel="noreferrer" style={{ color: "#0b0b0c" }}>{short(belt!.holder!)}</a> · {belt!.defenses} defence{belt!.defenses === 1 ? "" : "s"} · reign #{belt!.reigns} · since {new Date(belt!.since * 1000).toLocaleDateString()}
-            {mine && <span className="display" style={{ marginLeft: 10, fontSize: 20, background: "var(--tape)", padding: "1px 10px" }}>YOU HOLD THIS BELT</span>}
+            {mine && <br />}
+            {mine && <span className="display" style={{ marginTop: 6, fontSize: 20, background: "var(--tape)", padding: "1px 10px", whiteSpace: "nowrap", display: "inline-block" }}>YOU HOLD THIS BELT</span>}
           </>
         ) : (
           <>Nobody holds it. The first decisive ranked bout in this format crowns its winner. <b>NOT MINTED.</b></>
