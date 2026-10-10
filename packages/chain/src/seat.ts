@@ -37,10 +37,13 @@ export class Seat {
       side: 0 | 1;
       secrets: Secrets;
       hand?: readonly bigint[];
+      /** route every transaction through the caller (gas estimation, Monad's 1-tx-per-3-blocks spacing, a ledger) instead of a bare writeContract */
+      onSend?: (functionName: string, args: readonly unknown[]) => Promise<void>;
     },
   ) {}
 
   private async send(functionName: string, args: readonly unknown[]): Promise<void> {
+    if (this.o.onSend) return this.o.onSend(functionName, args);
     const hash = await this.o.walletClient.writeContract({ address: this.o.arena, abi: arenaAbi, functionName, args } as never);
     const r = await this.o.publicClient.waitForTransactionReceipt({ hash });
     if (r.status !== "success") throw new Error(`${functionName} reverted`);

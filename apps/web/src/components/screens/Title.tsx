@@ -9,11 +9,14 @@ import { useGame } from "@/lib/game";
 import { Stamp, Tape } from "../ui/Marks";
 import { sfx } from "@/lib/sfx";
 import { tutorialDone } from "@/lib/tutorial";
+import { useChain } from "@/lib/chainGame";
 
 export function Title() {
   const goLobby = useGame((s) => s.goLobby);
   const quickStart = useGame((s) => s.quickStart);
   const startTutorial = useGame((s) => s.startTutorial);
+  const deployed = useChain((s) => !!s.deployment);
+  const openChain = useChain((s) => s.openSetup);
   // browser-only storage: read after mount so server and client render the same first frame
   const [seen, setSeen] = useState(true);
   useEffect(() => setSeen(tutorialDone()), []);
@@ -80,11 +83,16 @@ export function Title() {
             </div>
           ))}
           <div style={{ marginTop: 18 }}>
-            <Stamp color="var(--blood)" size={20} rotate={-5}>SPARRING · OFFLINE BUILD</Stamp>
+            <Stamp color="var(--blood)" size={20} rotate={-5}>{deployed ? "LIVE ON MONAD TESTNET" : "SPARRING · OFFLINE BUILD"}</Stamp>
           </div>
         </div>
       </motion.div>
 
+      {deployed && (
+        <button onClick={() => { unlockAudio(); sfx.bell(); openChain(); }} className="display" style={{ position: "absolute", right: 36, top: 30, zIndex: 30, fontSize: 36, padding: "10px 28px", background: "var(--tape)", color: "#0b0b0c", border: "none", cursor: "pointer", transform: "rotate(1.5deg)", boxShadow: "0 0 0 3px #0b0b0c, 0 0 0 6px var(--tape), 0 14px 34px rgba(255,90,31,0.4)" }}>
+          ⛓ ON-CHAIN DUEL
+        </button>
+      )}
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 74, display: "flex", justifyContent: "center", gap: 26 }}>
         <div style={{ position: "relative" }}>
           {!seen && (
@@ -107,7 +115,7 @@ export function Title() {
         </button>
       </div>
       <div className="typewriter" style={{ position: "absolute", left: 0, right: 0, bottom: 22, textAlign: "center", fontSize: 14, color: "var(--smear)" }}>
-        Monad testnet · chain 10143 · on-chain commit–reveal comes online in the next milestone — this build plays locally against a sparring bot.
+        {deployed ? "Monad testnet · chain 10143 · the ⛓ ON-CHAIN DUEL runs every move through the Arena contract (commit → reveal). Sparring and the tutorial stay offline." : "Monad testnet · chain 10143 · contracts not deployed on this machine yet — sparring and the tutorial play locally against a bot."}
       </div>
     </div>
   );

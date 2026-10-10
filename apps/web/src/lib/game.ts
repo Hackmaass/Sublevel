@@ -16,6 +16,7 @@ import {
   applyReplacements,
   chooseReplacement,
   createBout,
+  encodeState,
   eqBot,
   greedyBot,
   habitBot,
@@ -31,6 +32,7 @@ import {
   type FormatRules,
   type GameEvent,
   type Loadout,
+  type TurnOutcome,
   type Side,
   TUTORIAL_FORMAT,
   TUTORIAL_LOADOUTS,
@@ -44,6 +46,17 @@ import { markTutorialDone } from "./tutorial";
 
 export type Stage = "setup" | "choose" | "waiting" | "reveal" | "replace" | "over";
 export type Difficulty = "rookie" | "regular" | "veteran";
+
+/**
+ * A bout whose moves go through the Arena contract instead of a local bot. The table, the reveal animation and the room don't know
+ * the difference: `runTurn` asks the driver for the opponent's action and the AUTHORITATIVE state, then plays the same animation.
+ */
+export interface ChainDriver {
+  /** seal + reveal one turn through the Arena; resolves with the opponent's revealed action and the state the CONTRACT holds */
+  playTurn(before: BoutState, mine: Action, hooks: { onOppLocked(): void }): Promise<{ theirs: Action; state: BoutState }>;
+  /** Lite sudden death: bring in the last fighter (a sealed replacement, like any other move) */
+  replace(state: BoutState, slot: number): Promise<BoutState>;
+}
 
 export interface Fx {
   id: number;
@@ -98,6 +111,10 @@ interface Store {
   manualOpen: boolean;
   /** the scripted first fight: which lesson, and whether the coach is waiting for "got it" after the turn landed */
   tutorial: { lesson: number; debrief: boolean } | null;
+  /** set when this bout is being played through the contracts */
+  chain: ChainDriver | null;
+  /** the contract and the TypeScript engine disagreed about a turn (should never happen; shown loudly if it does) */
+  chainMismatch: number;
   /** bumps when the player picks a move the current lesson doesn't allow (the coach reacts) */
   nudge: number;
 
@@ -105,6 +122,7 @@ interface Store {
   closeManual(): void;
   goLobby(): void;
   goTitle(): void;
+  startChainMatch(bout: BoutState, names: [string[], string[]], seeds: [number[], number[]], driver: ChainDriver): void;
   startTutorial(): void;
   tutorialContinue(): void;
   leaveTutorial(to: "lobby" | "title" | "fight"): void;
@@ -187,6 +205,8 @@ export const useGame = create<Store>((set, get) => ({
   quality: "high",
   manualOpen: false,
   tutorial: null,
+  chain: null,
+  chainMismatch: 0,
   nudge: 0,
 
   openManual: () => set({ manualOpen: true }),
@@ -211,7 +231,35 @@ export const useGame = create<Store>((set, get) => ({
     runToken++;
     releaseContinue();
     sfx.stopDrone();
-    set({ screen: "title", bout: null, shown: null, stage: "setup", reveal: null, locked: null, selected: null, fx: [], tutorial: null });
+    set({ screen: "title", bout: null, shown: null, stage: "setup", reveal: null, locked: null, selected: null, fx: [], tutorial: null, chain: null });
+  },
+
+  startChainMatch(bout, names, seeds, driver) {
+    runToken++;
+    releaseContinue();
+    rng = mulberry32((Date.now() ^ 0x2c1b3c6d) >>> 0);
+    set({
+      screen: "match",
+      format: bout.format,
+      bout,
+      shown: bout,
+      stage: "choose",
+      selected: null,
+      locked: null,
+      oppLocked: false,
+      reveal: null,
+      history: [],
+      fx: [],
+      meta: { name: names, seed: seeds },
+      turnEndsAt: 0, // the contract's own phase deadline (90 s) is the clock; no local auto-brace
+      banner: "ON-CHAIN",
+      tutorial: null,
+      chain: driver,
+      chainMismatch: 0,
+    });
+    sfx.startDrone();
+    sfx.bell();
+    setTimeout(() => get().banner === "ON-CHAIN" && set({ banner: null }), 1600);
   },
 
   startTutorial() {
@@ -249,7 +297,7 @@ export const useGame = create<Store>((set, get) => ({
     releaseContinue();
     markTutorialDone();
     sfx.stopDrone();
-    set({ tutorial: null, bout: null, shown: null, stage: "setup", reveal: null, locked: null, selected: null, fx: [] });
+    set({ tutorial: null, chain: null, bout: null, shown: null, stage: "setup", reveal: null, locked: null, selected: null, fx: [] });
     if (to === "fight") get().quickStart();
     else if (to === "lobby") set({ screen: "lobby" });
     else set({ screen: "title" });
@@ -291,6 +339,7 @@ export const useGame = create<Store>((set, get) => ({
       turnEndsAt: performance.now() + TURN_SECONDS * 1000,
       banner: "ROUND 1",
       tutorial: null,
+      chain: null,
     });
     sfx.startDrone();
     sfx.bell();
@@ -365,17 +414,47 @@ async function runTurn(mine: Action) {
   const st = () => useGame.getState();
   const alive = () => token === runToken;
   const bout0 = st().bout!;
-  const bot = st().tutorial ? tutorialBot : botFor(st().difficulty);
-  // "thinking" delay: opponent locks in a human-ish time later
-  await sleep(500 + Math.floor(rng() * 1100));
-  if (!alive()) return;
-  const theirs = bot(bout0, 1, rng);
-  useGame.setState({ oppLocked: true });
-  sfx.lock();
-  await sleep(350);
-  if (!alive()) return;
-
-  const out = resolveTurn(bout0, mine, theirs);
+  const driver = st().chain;
+  let theirs: Action;
+  let out: TurnOutcome;
+  if (driver) {
+    // ON-CHAIN: seal, wait for the house to seal, reveal, read the result back from the contract
+    try {
+      const r = await driver.playTurn(bout0, mine, {
+        onOppLocked: () => {
+          if (!alive()) return;
+          useGame.setState({ oppLocked: true });
+          sfx.lock();
+        },
+      });
+      if (!alive()) return;
+      theirs = r.theirs;
+      out = resolveTurn(bout0, mine, theirs); // the engine narrates (events for the animation)...
+      if (encodeState(out.state).join() !== encodeState(r.state).join()) {
+        // ...but the CONTRACT is the authority. A disagreement would be a bug: trust the chain and flag it.
+        console.warn("chain/engine mismatch", { engine: out.state, chain: r.state });
+        useGame.setState((s) => ({ chainMismatch: s.chainMismatch + 1 }));
+        out = { ...out, state: r.state };
+      }
+    } catch (e) {
+      if (!alive()) return;
+      console.error(e);
+      useGame.setState({ stage: "choose", locked: null, selected: null, oppLocked: false, banner: "CHAIN HICCUP — TRY AGAIN" });
+      setTimeout(() => useGame.getState().banner === "CHAIN HICCUP — TRY AGAIN" && useGame.setState({ banner: null }), 2500);
+      return;
+    }
+  } else {
+    const bot = st().tutorial ? tutorialBot : botFor(st().difficulty);
+    // "thinking" delay: opponent locks in a human-ish time later
+    await sleep(500 + Math.floor(rng() * 1100));
+    if (!alive()) return;
+    theirs = bot(bout0, 1, rng);
+    useGame.setState({ oppLocked: true });
+    sfx.lock();
+    await sleep(350);
+    if (!alive()) return;
+    out = resolveTurn(bout0, mine, theirs);
+  }
 
   // 0 → silence, tokens down
   useGame.setState({ stage: "reveal", reveal: { before: bout0, actions: [mine, theirs], step: 0, events: out.events } });
@@ -426,6 +505,23 @@ async function runTurn(mine: Action) {
     }
     useGame.setState({ stage: "over", reveal: null });
     sfx.stopDrone();
+    return;
+  }
+  if (next.phase === "replace" && st().chain) {
+    // Lite sudden death on chain: the only fighter left re-enters through a sealed replacement, like any other move
+    const only = legalReplacements(next, 0);
+    try {
+      const rep = await st().chain!.replace(next, only[0] ?? 0);
+      if (!alive()) return;
+      sfx.switchIn();
+      useGame.setState({ bout: rep, shown: rep });
+      await sleep(400);
+      if (!alive()) return;
+      beginNextTurn(rep);
+    } catch (e) {
+      console.error(e);
+      useGame.setState({ banner: "CHAIN HICCUP" });
+    }
     return;
   }
   if (next.phase === "replace") {

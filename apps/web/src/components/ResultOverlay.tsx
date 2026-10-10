@@ -8,6 +8,8 @@ import { FighterPoster } from "./FighterPoster";
 import { Stamp } from "./ui/Marks";
 import { takeaway, tape } from "@/lib/readback";
 import { roomReadLine, useRoom } from "@/lib/room";
+import { useChain } from "@/lib/chainGame";
+import { addressUrl } from "@/lib/monad";
 
 export function ResultOverlay() {
   const bout = useGame((s) => s.bout);
@@ -25,6 +27,11 @@ export function ResultOverlay() {
   const [showTape, setShowTape] = useState(false);
   const roomTurns = useRoom((s) => s.turns);
   const roomOn = useRoom((s) => s.on);
+  const onChain = useGame((s) => !!s.chain);
+  const ledger = useChain((s) => s.ledger);
+  const deployment = useChain((s) => s.deployment);
+  const boutId = useChain((s) => s.boutId);
+  const chainAgain = useChain((s) => s.start);
   if (!bout?.result) return null;
   const r = bout.result;
   const won = r.winner === 0;
@@ -54,6 +61,19 @@ export function ResultOverlay() {
           <div className="typewriter" style={{ fontSize: 13, marginTop: 4, color: "var(--smear)" }}>
             {history.length} exchanges · {me.dealt} damage dealt · {bout.sides[1].dealt} taken
           </div>
+          {onChain && (
+            <div className="typewriter" style={{ fontSize: 14, marginTop: 8, color: "var(--paper)" }}>
+              ⛓ {ledger.length} transactions on Monad testnet · avg {ledger.length ? Math.round(ledger.reduce((a, t) => a + t.ms, 0) / ledger.length) : 0} ms to land · bout #{boutId}
+              {deployment && (
+                <>
+                  {" "}·{" "}
+                  <a href={addressUrl(deployment.arena)} target="_blank" rel="noreferrer" style={{ color: "var(--tape)" }}>
+                    the Arena on the explorer
+                  </a>
+                </>
+              )}
+            </div>
+          )}
           {roomOn && roomTurns.length > 0 && (
             <div className="typewriter" style={{ fontSize: 15, marginTop: 8, color: "var(--paper)" }}>
               The room read you on <span style={{ color: "var(--tape)" }}>{roomReadLine(roomTurns, history.length).you}</span> of {roomReadLine(roomTurns, history.length).of} turns
@@ -67,7 +87,7 @@ export function ResultOverlay() {
             </div>
           )}
           <div style={{ display: "flex", gap: 14, justifyContent: "center", marginTop: 34 }}>
-            <button onClick={() => quickStart()} className="display" style={btn("var(--tape)", "#0b0b0c")}>REMATCH</button>
+            <button onClick={() => (onChain ? (goTitle(), void chainAgain()) : quickStart())} className="display" style={btn("var(--tape)", "#0b0b0c")}>{onChain ? "ANOTHER ON-CHAIN DUEL" : "REMATCH"}</button>
             <button onClick={() => setShowTape(true)} className="display" style={btn("var(--paper)", "#0b0b0c")}>THE TAPE</button>
             <button onClick={goLobby} className="display" style={btn("var(--paper)", "#0b0b0c")}>THE LOCKER</button>
             <button onClick={goTitle} className="display" style={btn("transparent", "var(--paper)", true)}>LEAVE</button>

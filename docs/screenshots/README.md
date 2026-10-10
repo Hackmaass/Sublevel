@@ -11,5 +11,6 @@ Regenerated whenever a feature changes — treat them as the current look, not a
 | `04-room-phone/` | The spectator phone view (same-browser mock). |
 | `05-venue-relay-qr/` | **Real phones via the relay + QR**: `01` title screen with the scan-to-join QR (it decodes to the machine's network address + room code) · `02`–`08` a phone joining, picking, getting SEALED, then its result after the reveal · `03` the QR stepping aside once a phone joined · `09` projector heat with a real phone on the leaderboard · `10`–`11` joining by typing the code. |
 | `06-deploy-page/` | The `/deploy` page: connect a wallet, see the real cost, one transaction deploys everything. **These shots are from a local test chain, not the real deployment** (addresses shown are throw-away). |
+| `07-onchain-duel/` | **The ON-CHAIN DUEL**: the button on the title, the setup modal (guest wallet + funding), the match with **THE LEDGER** (every tx: who, what, block, ms) and `chain = engine ✓`, and the result with the transaction count. *Run on a local chain with Monad's chain id; the real testnet shots are added after the live deploy.* |
 
 Run it for real: `pnpm web:demo` (production build on every network interface, port 3000), open `http://localhost:3000` on the big screen — the QR shows the machine's network address.

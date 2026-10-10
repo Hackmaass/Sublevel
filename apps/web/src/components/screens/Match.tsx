@@ -10,6 +10,7 @@ import { FxLayer } from "../FxLayer";
 import { ResultOverlay } from "../ResultOverlay";
 import { Coach, TutorialResult } from "../Coach";
 import { RoomView } from "../RoomView";
+import { Ledger } from "../Ledger";
 import { useRoom } from "@/lib/room";
 import { Stamp } from "../ui/Marks";
 import { TableScene, webglAvailable } from "../table/TableScene";
@@ -66,6 +67,7 @@ export function Match() {
       </AnimatePresence>
       {tutorial && <Coach />}
       {!tutorial && stage !== "over" && <RoomView />}
+      {stage !== "over" && <Ledger />}
       {stage === "over" && (tutorial ? <TutorialResult /> : <ResultOverlay />)}
       <div style={{ position: "absolute", left: 20, bottom: 12, zIndex: 60, display: "flex", gap: 8 }}>
         {[

@@ -29,6 +29,7 @@ export function RoomView() {
   const meta = useGame((s) => s.meta);
   const bout = useGame((s) => s.bout);
   const code = useRoom((s) => s.code);
+  const onChain = useGame((s) => !!s.chain);
 
   useEffect(() => {
     if (!roar) return;
@@ -109,8 +110,8 @@ export function RoomView() {
         </div>
       </div>
 
-      {/* leaderboard */}
-      <div style={{ ...panel, left: 28, top: 420, padding: "10px 16px" }}>
+      {/* leaderboard (the Ledger takes this spot in an on-chain duel) */}
+      {!onChain && <div style={{ ...panel, left: 28, top: 420, padding: "10px 16px" }}>
         <div className="stencil" style={{ fontSize: 13, letterSpacing: "0.22em", color: "var(--smear)", marginBottom: 4 }}>
           BEST READERS
         </div>
@@ -123,7 +124,7 @@ export function RoomView() {
             <span>{sp.points}</span>
           </div>
         ))}
-      </div>
+      </div>}
 
       <AnimatePresence>
         {roar && (

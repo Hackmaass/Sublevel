@@ -17,6 +17,7 @@ export function Hud() {
   const turnEndsAt = useGame((s) => s.turnEndsAt);
   const fx = useGame((s) => s.fx);
   const tutorial = useGame((s) => s.tutorial);
+  const onChain = useGame((s) => !!s.chain);
   const [now, setNow] = useState(() => performance.now());
 
   useEffect(() => {
@@ -83,7 +84,7 @@ export function Hud() {
             </Stamp>
           )}
           <span className="typewriter" style={{ fontSize: 13, color: "var(--smear)", marginLeft: left ? "auto" : 0, marginRight: left ? 0 : "auto" }}>
-            {side === 0 ? "YOU" : tutorial ? "COACH'S MAN" : "SPARRING"}
+            {side === 0 ? "YOU" : tutorial ? "COACH'S MAN" : onChain ? "THE HOUSE" : "SPARRING"}
           </span>
         </div>
         <div style={{ display: "flex", justifyContent: left ? "flex-start" : "flex-end", alignItems: "flex-end", gap: 26, marginTop: 10, flexDirection: left ? "row" : "row-reverse" }}>
@@ -120,12 +121,12 @@ export function Hud() {
       {plate(1)}
       {/* center: turn + clock */}
       <div style={{ position: "absolute", top: 196, left: "50%", transform: "translateX(-50%)", width: 320, textAlign: "center", zIndex: 21, padding: "6px 0 8px", background: "linear-gradient(180deg, rgba(8,8,9,0.0), rgba(8,8,9,0.55) 30%, rgba(8,8,9,0.55) 80%, rgba(8,8,9,0))" }}>
-        <div className="stencil" style={{ fontSize: 15, color: "var(--smear)", letterSpacing: "0.2em" }}>{tutorial ? "FIRST FIGHT" : bout.format.name.split(" ")[0]!.toUpperCase()} · {bout.sudden ? "SUDDEN DEATH" : `TURN ${Math.min(bout.turn + 1, bout.format.turnCap)}/${bout.format.turnCap}`}</div>
+        <div className="stencil" style={{ fontSize: 15, color: "var(--smear)", letterSpacing: "0.2em" }}>{tutorial ? "FIRST FIGHT" : onChain ? "ON-CHAIN · LITE" : bout.format.name.split(" ")[0]!.toUpperCase()} · {bout.sudden ? "SUDDEN DEATH" : `TURN ${Math.min(bout.turn + 1, bout.format.turnCap)}/${bout.format.turnCap}`}</div>
         <div className="display flicker" style={{ fontSize: 88, lineHeight: 1, color: urgent ? "var(--tape)" : "var(--paper)", textShadow: urgent ? "0 0 24px rgba(255,90,31,0.7)" : "none" }}>
-          {tutorial ? `${Math.min(tutorial.lesson + 1, 6)}/6` : stage === "choose" ? String(secs).padStart(2, "0") : "──"}
+          {tutorial ? `${Math.min(tutorial.lesson + 1, 6)}/6` : onChain ? "LIVE" : stage === "choose" ? String(secs).padStart(2, "0") : "──"}
         </div>
         <div className="typewriter" style={{ fontSize: 12, color: "var(--smear)" }}>
-          {stage === "choose" ? (tutorial ? "your lesson — follow the coach" : "pick a move · [Enter] to lock") : stage === "waiting" ? "waiting for the other side…" : stage === "reveal" ? "…" : stage === "replace" ? "choose your next fighter" : ""}
+          {stage === "choose" ? (tutorial ? "your lesson — follow the coach" : onChain ? "every move is a transaction · [Enter] to seal" : "pick a move · [Enter] to lock") : stage === "waiting" ? (onChain ? "sealed on-chain · waiting for the house…" : "waiting for the other side…") : stage === "reveal" ? "…" : stage === "replace" ? "choose your next fighter" : ""}
         </div>
       </div>
     </>

@@ -21,7 +21,9 @@ const localRpc = (() => {
   return v && /^http:\/\/(127\.0\.0\.1|localhost):\d{2,5}\/?$/.test(v) ? v : undefined;
 })();
 
-export const publicClient = createPublicClient({ chain: monadTestnet, transport: http(localRpc) });
+export const rpcUrl = localRpc;
+/** Monad's blocks are ~0.4 s: poll for receipts far faster than viem's 4 s default */
+export const publicClient = createPublicClient({ chain: monadTestnet, transport: http(localRpc), pollingInterval: 200 });
 
 /** the minimal EIP-1193 surface we use from an injected wallet (MetaMask, Rabby, …) */
 export interface Eip1193 {
