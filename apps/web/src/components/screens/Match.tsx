@@ -12,6 +12,7 @@ import { Coach, TutorialResult } from "../Coach";
 import { RoomView } from "../RoomView";
 import { Ledger } from "../Ledger";
 import { useRoom } from "@/lib/room";
+import { useViewport } from "@/lib/viewport";
 import { Stamp } from "../ui/Marks";
 import { TableScene, webglAvailable } from "../table/TableScene";
 
@@ -29,6 +30,10 @@ export function Match() {
   const quality = useGame((s) => s.quality);
   const setQuality = useGame((s) => s.setQuality);
   const [gl, setGl] = useState<boolean | null>(null);
+  const vp = useViewport();
+  useEffect(() => {
+    if (vp?.coarse) useGame.getState().setQuality("low"); // phones: the cheaper 3D tier by default
+  }, [vp?.coarse]);
   const roomOn = useRoom((s) => s.on);
   const toggleRoom = useRoom((s) => s.toggle);
 

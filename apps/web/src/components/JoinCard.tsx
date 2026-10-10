@@ -6,6 +6,7 @@ import QRCode from "qrcode";
 import { useGame } from "@/lib/game";
 import { useRoom } from "@/lib/room";
 import { RELAY_ENABLED } from "@/lib/roomBridge";
+import { useViewport } from "@/lib/viewport";
 
 /** The address a phone should open: the page's own origin, or — when this screen was opened as `localhost` — this machine's network address. */
 export function useJoinUrl(): { url: string | null; host: string | null } {
@@ -61,9 +62,11 @@ export function ScanToJoin() {
   const relay = useRoom((s) => s.relay);
   const code = useRoom((s) => s.code);
   const on = useRoom((s) => s.on);
+  const vp = useViewport();
   const { url, host } = useJoinUrl();
   const qr = useQr(url);
-  const show = on && qrBig && relay === "online" && !!qr && !tutorial && screen !== "lobby";
+  const bigScreen = !!vp && !vp.compact && !vp.coarse;
+  const show = bigScreen && on && qrBig && relay === "online" && !!qr && !tutorial && screen !== "lobby";
   const title = screen === "title";
 
   return (

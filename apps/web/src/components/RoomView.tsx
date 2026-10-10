@@ -6,6 +6,7 @@ import { CLASS_NAMES } from "@sublevel/engine";
 import { useGame } from "@/lib/game";
 import { useRoom } from "@/lib/room";
 import { sfx } from "@/lib/sfx";
+import { useViewport } from "@/lib/viewport";
 import { Stamp } from "./ui/Marks";
 
 const panel: React.CSSProperties = {
@@ -30,6 +31,7 @@ export function RoomView() {
   const bout = useGame((s) => s.bout);
   const code = useRoom((s) => s.code);
   const onChain = useGame((s) => !!s.chain);
+  const vp = useViewport();
 
   useEffect(() => {
     if (!roar) return;
@@ -38,7 +40,7 @@ export function RoomView() {
     return () => clearTimeout(id);
   }, [roar]);
 
-  if (!on || !bout) return null;
+  if (!on || !bout || !vp || vp.compact) return null; // the side panels need room; a phone-sized window gets the fight itself
   const last = turns[turns.length - 1];
   const board = [...spectators].sort((a, b) => b.points - a.points).slice(0, 5);
   const phones = spectators.filter((s) => s.human).length;

@@ -114,3 +114,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .flicker { animation: none; }
 }
+
+@keyframes rotateHint {
+  0%, 30% { transform: rotate(-90deg); }
+  60%, 100% { transform: rotate(0deg); }
+}

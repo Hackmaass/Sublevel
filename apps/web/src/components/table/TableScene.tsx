@@ -78,6 +78,9 @@ function SceneInner() {
         camera={{ fov: 30, position: [0, 3.7, 8.0], near: 0.1, far: 60 }}
         gl={{ antialias: !high, powerPreference: "high-performance", toneMapping: THREE.NoToneMapping }}
         style={{ position: "absolute", inset: 0 }}
+        // The whole UI sits inside a CSS-scaled 1920×1080 stage. Measure the LAYOUT size (offsetWidth/Height), not the scaled bounding box,
+        // or the canvas is shrunk twice and the table renders in a corner on every window that isn't exactly 1920×1080.
+        resize={{ offsetSize: true, scroll: false }}
       >
         {/* real-GPU safety net: sustained low fps drops to the cheaper tier automatically */}
         <PerformanceMonitor bounds={() => [28, 58]} flipflops={2} onDecline={() => useGame.getState().setQuality("low")} />
