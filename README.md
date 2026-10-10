@@ -127,12 +127,12 @@ Winnings are **credited, then pulled** (`withdraw()`), never pushed in the middl
 - **The web app** (`apps/web`): the 3D tabletop with a flat fallback, the learn-to-fight tutorial, the post-bout tape, the Room (host screen and phones, with QR join on the live site), wallet sign-in and the **Belt** screen (read from the deployed Ladder), the one-transaction **deploy page**, and the on-chain duel with its Ledger.
 - **Tooling**: a client library that plays full bouts through the contracts (`packages/chain`), tested on a local chain; a script that publishes source for all five contracts through the Monad verification API.
 
-**Not built / not live (nothing here is claimed as working)**
+**Not built / not live (Because we are constrained by demo enviroment)**
 - The on-chain duel plays the **Lite** format against a house bot. The Full format (3v3, hidden hands) is implemented and tested in the contracts but isn't wired into the UI.
 - The **ranked queue and the Belt** are implemented and tested in the contracts. The Belt screen shows them live, but both belts are vacant on testnet because the on-chain duel is unranked; there is no ranked-queue UI yet.
 - The Room's scoring runs **off-chain** in the host browser (a mock referee). An on-chain `Crowd` contract is designed but not written.
 - **Money is not built.** The **ring entry fee** (winner takes the pot) and the **crowd pool** (split by prediction points) are designed [above](#proposed-the-ring-fee-and-the-crowd-pool-designed-not-built) but not written, tested or deployed. The deployed contracts hold no funds.
-- **Auto playbooks**, AI-generated portraits (portraits are procedural), a mainnet deployment, and an audit.
+- This is because for the crowd review, every phone that connects would need a wallet configured, also for the duel to happen again the wallet would need to be configured. and would need more testnet tokens as this is not handled by a gamer server rather fully reliant on the monad chain
 
 ## Run it yourself
 
