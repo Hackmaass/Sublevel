@@ -1,0 +1,357 @@
+<title>SUBLEVEL Project Dossier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout concept: a case file. Sticky index rail on the left, one reading column, diagrams and tables allowed to run wider.
+   Palette is the game's own: toner black, photocopy paper, orange gaffer tape, one blood-red for losses. */
+:root {
+  --bg: #0e0e10;
+  --bg2: #17171a;
+  --ink: #ece7da;
+  --muted: #9b978b;
+  --rule: #2d2d31;
+  --accent: #ff5a1f;
+  --blood: #e5484d;
+  --good: #7bc47f;
+  --warn: #e3b341;
+  --display: "Anton", Impact, "Arial Narrow Bold", sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #ecece7; --bg2: #e1e1da; --ink: #141416; --muted: #5d5b53; --rule: #c9c8bf;
+    --accent: #cf420a; --blood: #c1272d; --good: #2f7d37; --warn: #94700a; color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #ecece7; --bg2: #e1e1da; --ink: #141416; --muted: #5d5b53; --rule: #c9c8bf;
+  --accent: #cf420a; --blood: #c1272d; --good: #2f7d37; --warn: #94700a; color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.62 var(--body); padding-inline: 16px; padding-block: 0 80px; margin: 0; }
+.wrap { max-width: 1180px; margin-inline: auto; display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 56px; }
+nav.rail { position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; padding-top: 44px; font: 500 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+nav.rail a { display: block; padding: 9px 0; color: var(--muted); text-decoration: none; border-top: 1px solid var(--rule); }
+nav.rail a:hover, nav.rail a:focus-visible { color: var(--accent); outline: none; }
+main { min-width: 0; padding-top: 44px; }
+header.hero { border-bottom: 3px solid var(--ink); padding-bottom: 28px; margin-bottom: 8px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .22em; text-transform: uppercase; color: var(--accent); }
+h1 { font: 400 clamp(54px, 11vw, 124px)/.92 var(--display); text-transform: uppercase; margin: 14px 0 18px; letter-spacing: .005em; text-wrap: balance; }
+.lede { font-size: clamp(18px, 2.4vw, 22px); line-height: 1.5; max-width: 62ch; margin: 0; }
+.lede b { color: var(--accent); font-weight: 600; }
+.stats { display: flex; flex-wrap: wrap; gap: 0; margin-top: 28px; border: 1px solid var(--rule); }
+.stat { flex: 1 1 150px; padding: 14px 16px; border-right: 1px solid var(--rule); min-width: 0; }
+.stat:last-child { border-right: 0; }
+.stat b { display: block; font: 400 38px/1 var(--display); font-variant-numeric: tabular-nums; }
+.stat span { font: 400 12px/1.3 var(--mono); color: var(--muted); display: block; margin-top: 6px; }
+section { padding-top: 56px; }
+h2 { font: 400 clamp(34px, 5vw, 52px)/1 var(--display); text-transform: uppercase; margin: 0 0 6px; text-wrap: balance; }
+h2 small { display: block; font: 500 12px/1 var(--mono); letter-spacing: .2em; color: var(--accent); margin-bottom: 10px; }
+h3 { font: 600 18px/1.3 var(--body); margin: 30px 0 6px; }
+p { margin: 0 0 14px; max-width: 70ch; }
+ul, ol { margin: 0 0 16px; padding-left: 22px; max-width: 70ch; }
+li { margin-bottom: 6px; }
+code { font: 500 .88em var(--mono); background: var(--bg2); padding: 1px 5px; border-radius: 3px; }
+a { color: var(--accent); }
+.note { border-left: 4px solid var(--accent); background: var(--bg2); padding: 12px 16px; margin: 18px 0; max-width: 74ch; }
+.note.bad { border-color: var(--blood); }
+.note b:first-child { font: 500 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+.tablewrap { overflow-x: auto; margin: 14px 0 22px; border: 1px solid var(--rule); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 500 12px/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); background: var(--bg2); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+.pill { display: inline-block; font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 4px 7px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--good); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--blood); }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin: 16px 0 22px; }
+.card { background: var(--bg2); border: 1px solid var(--rule); padding: 16px 18px; min-width: 0; }
+.card h4 { font: 400 26px/1 var(--display); text-transform: uppercase; margin: 0 0 8px; }
+.card p { font-size: 14.5px; margin: 0 0 8px; }
+.card .tag { font: 500 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; display: block; }
+.order { display: flex; flex-wrap: wrap; gap: 0; margin: 16px 0 22px; counter-reset: step; list-style: none; padding: 0; max-width: none; }
+.order li { flex: 1 1 130px; min-width: 0; padding: 12px 14px; border: 1px solid var(--rule); margin: 0 -1px -1px 0; background: var(--bg2); font-size: 14px; counter-increment: step; }
+.order li::before { content: counter(step); display: block; font: 400 30px/1 var(--display); color: var(--accent); margin-bottom: 4px; }
+.order li b { display: block; font-weight: 600; }
+.tri { display: flex; flex-wrap: wrap; gap: 24px; align-items: center; margin: 16px 0; }
+.tri svg { width: 230px; max-width: 100%; height: auto; flex: none; }
+.tri svg text { font: 500 12px var(--mono); fill: var(--ink); }
+pre.mermaid { background: var(--bg2); border: 1px solid var(--rule); padding: 18px; overflow-x: auto; margin: 16px 0 24px; }
+.cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+footer { margin-top: 70px; padding-top: 18px; border-top: 3px solid var(--ink); font: 400 12.5px/1.6 var(--mono); color: var(--muted); }
+@media (max-width: 880px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  nav.rail { position: static; padding-top: 24px; display: flex; flex-wrap: wrap; gap: 0 18px; }
+  nav.rail a { border-top: 0; padding: 6px 0; }
+  .stat { border-right: 0; border-bottom: 1px solid var(--rule); }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="wrap">
+<nav class="rail" aria-label="Sections">
+  <a href="#what">What it is</a>
+  <a href="#game">The game</a>
+  <a href="#depth">Is it deep?</a>
+  <a href="#why">Why Monad</a>
+  <a href="#contracts">Contracts</a>
+  <a href="#hidden">Full: hidden hands</a>
+  <a href="#client">The client</a>
+  <a href="#proof">Verification</a>
+  <a href="#status">Status</a>
+</nav>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">Monad Blitz Pune V3 &middot; working title</div>
+  <h1>Sublevel</h1>
+  <p class="lede">A <b>one-on-one card duel</b> played in a basement. Both fighters pick a move <b>in secret</b>, both reveal at the same instant, and a contract on Monad resolves the turn. There are no dice and no referee to trust. The cards are NFTs, and their fight records are written by the rules and by nothing else.</p>
+  <div class="stats">
+    <div class="stat"><b>78</b><span>legal fighter builds (76 of 78 within 40-60% win rate in the round-robin)</span></div>
+    <div class="stat"><b>2</b><span>formats: Lite (~1 min) and Full (~3 min)</span></div>
+    <div class="stat"><b>1,541</b><span>rule vectors the contracts reproduce exactly</span></div>
+    <div class="stat"><b>49</b><span>Foundry tests, plus 39 engine and 5 chain tests</span></div>
+    <div class="stat"><b>0</b><span>owner, admin, pause or upgrade powers</span></div>
+  </div>
+</header>
+
+<section id="what">
+  <h2><small>01 / Overview</small>What it is</h2>
+  <p>Sublevel is a competitive duel game with a fight-club look: photocopied posters, tape, a bare bulb over a table. Two players each bring a small corner of fighters and one-shot dirty tricks. Every turn each side secretly chooses one action, locks it in, and the two choices are revealed together. The result depends only on what you picked against what they picked.</p>
+  <p>It is built for the Monad Blitz Pune hackathon. The brief asked for a serious game product where the Web3 part is meaningful, with polish and originality. It draws on two reference projects without copying either. From <b>Promptmon</b> it takes the idea of fighters you author yourself and cards worth owning. From <b>Street Aura</b> it takes the live, block-driven feel of a match on a fast chain. Its own ideas are the simultaneous-move duel, the guard triangle, and a hidden-hand format that works on a public ledger.</p>
+
+  <h3>One bout, from the player's seat</h3>
+  <ol>
+    <li><b>Build or pick a corner.</b> House fighters, or your own from the Workbench: one style, one light and one heavy attack, one spread.</li>
+    <li><b>Challenge or accept.</b> A pool of cards is locked into the bout. Neither side can swap a card mid-fight.</li>
+    <li><b>Lead.</b> Each side secretly picks which fighter starts. Both are revealed together.</li>
+    <li><b>Turns.</b> Each side locks one action as a hash. Once both are locked, both reveal. The contract resolves the turn and emits what happened.</li>
+    <li><b>Finish.</b> Knock out the target number of fighters, or win on a decision at the turn cap. Each card that fought gets a permanent entry in its record.</li>
+  </ol>
+</section>
+
+<section id="game">
+  <h2><small>02 / Rules</small>The game</h2>
+  <h3>A fighter is five choices</h3>
+  <p>A fighter is a <b>style</b>, <b>one light attack</b>, <b>one heavy attack</b> of that style, and a <b>spread</b>. That gives 78 builds. The rule is enforced at mint, so a card can never exist in a form the rules do not understand. A prompt or a name changes how a fighter looks and what their story is. It never changes what they can do.</p>
+  <div class="grid3">
+    <div class="card"><span class="tag">Style</span><h4>Brawl</h4><p>Expensive, hard-hitting. Two attacks pierce a bad matchup.</p><p>Beats Clinch.</p></div>
+    <div class="card"><span class="tag">Style</span><h4>Clinch</h4><p>Grapples ignore your guard completely.</p><p>Beats Slick.</p></div>
+    <div class="card"><span class="tag">Style</span><h4>Slick</h4><p>Cheap and quick. Counters punish a Switch.</p><p>Beats Brawl.</p></div>
+  </div>
+  <div class="tri">
+    <svg viewBox="0 0 230 200" role="img" aria-label="Brawl beats Clinch, Clinch beats Slick, Slick beats Brawl">
+      <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="currentColor"/></marker></defs>
+      <g style="color:var(--accent)" stroke="currentColor" stroke-width="2.2" fill="none">
+        <line x1="92" y1="46" x2="148" y2="146" marker-end="url(#ar)"/>
+        <line x1="136" y1="172" x2="78" y2="172" marker-end="url(#ar)" transform="translate(0,0)"/>
+        <line x1="62" y1="146" x2="112" y2="52" marker-end="url(#ar)"/>
+      </g>
+      <text x="92" y="26" text-anchor="middle">BRAWL</text>
+      <text x="172" y="168" text-anchor="middle">CLINCH</text>
+      <text x="40" y="168" text-anchor="middle">SLICK</text>
+      <text x="115" y="196" text-anchor="middle" style="fill:var(--muted)">x1.5 damage / x2/3 when weak</text>
+    </svg>
+    <p style="max-width:46ch">The style triangle scales damage by 1.5 (rounded up) when you hold the advantage and by two thirds (minimum 1) when you do not. Pierce attacks ignore the bad matchup.</p>
+  </div>
+
+  <h3>Actions and Grit</h3>
+  <p>Eight actions exist: Attack 1, Attack 2, Brace, Switch to a bench slot, and Use a trick. Everything except Brace costs <b>Grit</b>. Grit is gained at one per turn and capped at five, so a heavy attack is a decision about when you can afford it. A light attack costs two or less, a heavy attack three or more.</p>
+
+  <h3>How a turn resolves</h3>
+  <ol class="order">
+    <li><b>Pay costs</b>Grit is spent for attacks, switches and tricks.</li>
+    <li><b>Switch</b>Fighters change places.</li>
+    <li><b>Tricks</b>Heals and denial first, then damage and nullifiers.</li>
+    <li><b>Attacks</b>Both attacks land at the same time.</li>
+    <li><b>Brace</b>A guard gives +1 Grit, but only the first in a row.</li>
+    <li><b>Refund</b>A Switch no attack punished gets its cost back.</li>
+    <li><b>KOs, Grit, end</b>Knockouts, Grit gain, then end checks.</li>
+  </ol>
+
+  <h3>The guard triangle</h3>
+  <p>A second triangle sits under the first, between attacks and Brace.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>You do</th><th>They do</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td>Light attack</td><td>Brace</td><td>Fully blocked.</td></tr>
+      <tr><td>Heavy attack</td><td>Brace</td><td>Guard breaks: about two thirds of the damage gets through.</td></tr>
+      <tr><td>Light attack</td><td>Heavy attack</td><td>Interrupts it: their heavy deals half damage.</td></tr>
+      <tr><td>Grapple</td><td>Brace</td><td>Brace is ignored.</td></tr>
+      <tr><td>Counter attack</td><td>Switch</td><td>+2 damage.</td></tr>
+      <tr><td>Switch</td><td>no attack against you</td><td>Free: the retreat cost is refunded.</td></tr>
+    </tbody>
+  </table></div>
+  <p>No single action wins. Brace beats light, heavy beats Brace, light beats heavy. A player who always does one thing is readable and loses to the counter.</p>
+
+  <h3>Two formats</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th></th><th>Lite &mdash; First Blood</th><th>Full &mdash; Main Card</th></tr></thead>
+    <tbody>
+      <tr><td>Fighters / tricks</td><td>2 / 1</td><td>3 / 2, chosen from a pool of 8</td></tr>
+      <tr><td>Knockouts to win</td><td>1</td><td>2</td></tr>
+      <tr><td>Turn cap</td><td>8</td><td>10</td></tr>
+      <tr><td>Starting Grit</td><td>2</td><td>3</td></tr>
+      <tr><td>Fighter HP</td><td>100%</td><td>75%</td></tr>
+      <tr><td>Opponent sees your corner</td><td>Yes. Only the lead is secret.</td><td>No. A card is shown only when it is played.</td></tr>
+      <tr><td>Feels like</td><td>A quick draw, about a minute</td><td>A real fight, about three minutes</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Endings.</b> Reach the knockout target to win. If both sides would win on the same turn, the surviving fighters re-enter at half HP for <b>sudden death</b>, where the next knockout wins. At the turn cap a decision compares knockouts, then remaining HP, then damage dealt.</p>
+  <p><b>Tricks</b> are one-shot cards: Cheap Shot (2 damage, ignores Brace), Patch Up (heal 3), Second Wind (+2 Grit), Smoke Bomb (their attack deals half), Sucker Punch (if they attack, take nothing and deal 3), Low Blow (they lose 2 Grit).</p>
+</section>
+
+<section id="depth">
+  <h2><small>03 / Design validation</small>Is it deep?</h2>
+  <p>The first question was whether a simultaneous-move duel stays interesting after the first few games. The rules were tested before any contract was written. A simulator plays millions of turns, a value function is fitted to real game states, a regret-matching solver finds near-equilibrium play, and an exploit finder checks whether a habit can be punished.</p>
+  <p>That process changed the game. An early version let Brace dominate. The matrix and the fitted evaluation showed it, and the guard triangle plus the free-Switch refund came out of that finding. The attack menu was cut to one light and one heavy per fighter for the same reason: it removes trap builds and keeps the guard triangle alive in every fight.</p>
+  <div class="note"><b>Stated plainly</b>The gate passed with caveats, and they are written down in <code>packages/engine/RULES.md</code>. One requirement was restated after testing (R1 became R1&prime;). The Lite reading-skill score is 7.3 against a target of 8. Full's position-shift measure is low. Sample sizes are modest and should be rerun at n&nbsp;&ge;&nbsp;400 before launch.</div>
+</section>
+
+<section id="why">
+  <h2><small>04 / The chain's job</small>Why Monad</h2>
+  <p>The test for every on-chain piece is simple: what breaks if this were a database? For this game the answers are specific.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>On-chain</th><th>If it were a database</th></tr></thead>
+    <tbody>
+      <tr><td>Commit and reveal, then resolution by the rules</td><td>The operator could read a move before it is revealed or edit a result.</td></tr>
+      <tr><td>Hidden-hand slot hashes and openings (Full)</td><td>No proof that nobody swapped a card mid-bout.</td></tr>
+      <tr><td>Card records and scars</td><td>History becomes editable, so a career means nothing.</td></tr>
+      <tr><td>Locks while a pool is in a bout</td><td>You would need a trusted custodian.</td></tr>
+      <tr><td>A frozen, versioned rulebook</td><td>The operator could quietly rebalance a card you own.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Monad is the right place because the game needs a transaction per turn per player. A Lite bout takes roughly 12 to 16 transactions and a Full bout about 32. At about 0.3 second blocks (documented slots are 300 ms with 600 ms finality, and testnet blocks measured near 318 ms) that cadence feels like a game and not like waiting on a ledger. Session keys remove the wallet pop-up from every move.</p>
+</section>
+
+<section id="contracts">
+  <h2><small>05 / Solidity</small>Contracts</h2>
+  <pre class="mermaid">
+flowchart LR
+  TS["TypeScript engine<br/>(source of truth)"] -->|"solgen"| RB["RulebookV1.sol<br/>(generated)"]
+  TS -->|"vectors + whole bouts"| T["Foundry tests"]
+  RB --> E["Engine.sol<br/>pure rules"]
+  E --> A["Arena.sol<br/>commit, reveal,<br/>timeouts, settlement"]
+  C["Cards.sol<br/>ERC-721 fighters + tricks"] --> R["Armory.sol<br/>pools + session keys"]
+  R --> A
+  A -->|"only writer"| C
+  B["Bootstrap.sol<br/>deploys and wires, then nothing"] -.-> C
+  B -.-> R
+  B -.-> A
+  </pre>
+  <div class="grid3">
+    <div class="card"><span class="tag">Rules</span><h4>Engine</h4><p>A pure library, line for line the same rules as the TypeScript engine. No randomness, no time, no storage. Bouts are stored as 88 packed 16-bit values (176 bytes).</p></div>
+    <div class="card"><span class="tag">NFTs</span><h4>Cards</h4><p>ERC-721 with ERC-4906. The build, name and look are immutable. The career record is written only by the Arena. Minting is free, names use a safe alphabet, and <code>tokenURI</code> is generated on-chain.</p></div>
+    <div class="card"><span class="tag">Pools</span><h4>Armory</h4><p>Registers pools (Lite: 3 cards, Full: 8 cards with at least 3 fighters and 2 tricks) and locks them. Owns the session keys.</p></div>
+    <div class="card"><span class="tag">Referee</span><h4>Arena</h4><p>Challenges, secret simultaneous moves, a 90-second phase clock, forfeits, hidden-hand openings, and settlement.</p></div>
+    <div class="card"><span class="tag">Deploy</span><h4>Bootstrap</h4><p>One transaction deploys and wires all three, then has no function left. Nobody, including the sender, holds any power afterwards.</p></div>
+  </div>
+
+  <h3>One turn on-chain</h3>
+  <pre class="mermaid">
+sequenceDiagram
+  participant A as Player A
+  participant R as Arena
+  participant B as Player B
+  A->>R: commit(hash of move + salt)
+  B->>R: commit(hash of move + salt)
+  Note over R: both locked, reveal window opens
+  A->>R: reveal(move, salt [, card opening])
+  B->>R: reveal(move, salt [, card opening])
+  Note over R: Engine resolves the turn
+  R-->>A: TurnResolved(state, events)
+  R-->>B: TurnResolved(state, events)
+  </pre>
+
+  <h3>The fairness rules</h3>
+  <ul>
+    <li>A commit is <code>keccak(chainId, arena, boutId, turn, phaseTag, player, choice, salt)</code>. The phase tag keeps lead, action and replacement commits apart, and each (side, tag, turn) is used at most once per bout.</li>
+    <li>A reveal that does not match its commit, or that is illegal, <b>forfeits</b> the bout. A missed deadline forfeits. If both sides miss, the bout is voided.</li>
+    <li>A session key can commit, reveal and open cards for the owner who authorised it. It cannot create or accept challenges, register pools, transfer, approve or lock anything. It is authorised per owner for up to 7 days, so keys should be short-lived.</li>
+    <li>No randomness anywhere, and no function handles MON. There is no custody or reentrancy surface to attack.</li>
+    <li>Records are labelled <b>unranked</b> in v1. Open challenges can be farmed with spare wallets, and ranked play needs blind matchmaking.</li>
+  </ul>
+</section>
+
+<section id="hidden">
+  <h2><small>06 / The hard part</small>Full: hidden hands</h2>
+  <p>A public ledger cannot hide a card by default. Full needs your bench and tricks to stay secret until played, while still proving nobody cheated. The pool of 8 cards is public, so a plain hash of a card could be guessed by trying all 8.</p>
+  <ol>
+    <li><b>Blinded slots.</b> The lead commit binds the lead slot and five slot hashes, one per hidden slot. Each hash includes its own secret salt, so there is nothing to brute-force.</li>
+    <li><b>Open on demand.</b> A card is revealed in the same transaction as the move that first needs it: the lead, a switch, a trick, or a replacement.</li>
+    <li><b>Every opening is checked.</b> It must match its locked slot hash, belong to the locked pool, fit the slot (fighter or trick), and not repeat a card. A bad opening forfeits.</li>
+    <li><b>Almost nothing else is forced.</b> Only two rules read unplayed fighters: a tied turn-cap decision, which compares every fighter's HP, and sudden-death re-entry. The engine pauses there. Both sides open exactly what is needed, or forfeit at the deadline. Tricks are never forced.</li>
+  </ol>
+  <div class="note"><b>Secrets must survive a refresh</b>A Full bout needs six secrets for its whole length. The client derives all of them from one wallet signature over a per-bout message, so a player who reloads the page signs again and carries on. This is tested: both seats were rebuilt from fresh signatures mid-bout and the bout finished correctly.</div>
+</section>
+
+<section id="client">
+  <h2><small>07 / What you see</small>The client</h2>
+  <div class="grid3">
+    <div class="card"><span class="tag">View</span><h4>The Table</h4><p>A side-on 3D diorama built with React Three Fiber: concrete wall, worn floor, wooden table, fighter standees under a work light. The same game state also drives a flat 2D view, so the game never depends on the 3D layer.</p></div>
+    <div class="card"><span class="tag">Build</span><h4>Workbench</h4><p>Assemble a fighter from modules with a live poster and a fight sheet derived from the rulebook. Names follow the same alphabet the Cards contract enforces. Saved fighters live in the browser.</p></div>
+    <div class="card"><span class="tag">Learn</span><h4>Manual</h4><p>An in-game rulebook and a standalone <code>HOW_TO_PLAY.md</code>. Its tables are generated from the rulebook, so the text cannot drift from the rules.</p></div>
+  </div>
+  <p>Art is procedural: SVG portraits, canvas posters, a procedural WebAudio soundscape, and public-domain Poly Haven textures (licences recorded in <code>ASSETS.md</code>). The client is Next.js 16 with React 19. A TypeScript chain library (viem) holds every commitment, the secret derivation, and a <code>Seat</code> class that performs each on-chain call.</p>
+</section>
+
+<section id="proof">
+  <h2><small>08 / Evidence</small>Verification</h2>
+  <p>The same rules exist in two languages, so the central risk is drift. The project closes it with shared test data and replays instead of trust.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Check</th><th>What it proves</th><th class="num">Result</th></tr></thead>
+    <tbody>
+      <tr><td>Rule vectors</td><td>Solidity reproduces the TypeScript engine's next state and events on every case, with a coverage gate on 34 rule paths.</td><td class="num">1,541</td></tr>
+      <tr><td>Whole-bout replay</td><td>Real bouts play through the real contracts (mint, pool, challenge, commit, reveal) and end in the identical state. 43 of them are Full, with random hidden hands.</td><td class="num">83</td></tr>
+      <tr><td>Pause coverage</td><td>Both hidden-data pauses (tied cap, sudden death) occur in replays. Disabling either one fails the replay.</td><td class="num">4 + 3</td></tr>
+      <tr><td>Hidden-hand tests</td><td>Including every cheat: wrong salt, foreign card, duplicate card, trick in a fighter slot, wrong slot, mismatched slot hashes, skipped end reveal. Removing the duplicate or kind check makes them fail.</td><td class="num">26</td></tr>
+      <tr><td>Fuzzing</td><td>Random Lite and Full bouts equal the engine step for step (256 runs each).</td><td class="num">512</td></tr>
+      <tr><td>TypeScript client on a local node</td><td>Client hashes equal Solidity's. Lite and Full bouts finish with the engine's state. A bout survives a simulated page refresh.</td><td class="num">5</td></tr>
+      <tr><td>Decoder</td><td>Every vector state and event list decodes and re-encodes identically.</td><td class="num">1,541</td></tr>
+    </tbody>
+  </table></div>
+  <p>Measured gas on a plain EVM, before Monad's higher cold-storage costs: create a challenge about 134k, commit about 68&ndash;79k, a resolving reveal about 310k, a Full reveal with a card opening about 300k, and the one-transaction deployment about 13.3M.</p>
+</section>
+
+<section id="status">
+  <h2><small>09 / Where it stands</small>Status</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Area</th><th>State</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Rulebook v1 and engine</td><td><span class="pill good">Done</span></td><td>Frozen. Simulator, bots, solver, depth gate, manual.</td></tr>
+      <tr><td>Playable client, 2D and 3D</td><td><span class="pill good">Done</span></td><td>Plays against house bots. Real-GPU frame rate is not measured yet.</td></tr>
+      <tr><td>Workbench</td><td><span class="pill good">Done</span></td><td>Style, attacks, spread, name. Saved locally.</td></tr>
+      <tr><td>Contracts, Lite and Full</td><td><span class="pill good">Done</span></td><td>Tested. Unaudited.</td></tr>
+      <tr><td>Chain client library</td><td><span class="pill good">Done</span></td><td>Tested against a local node.</td></tr>
+      <tr><td>Deployment to Monad testnet</td><td><span class="pill warn">Next</span></td><td>Needs the owner's wallet. Gas must be re-measured on Monad.</td></tr>
+      <tr><td>UI switch to on-chain play, event feed</td><td><span class="pill warn">Next</span></td><td>The pause screen and the new on-chain values need UI.</td></tr>
+      <tr><td>AI-generated art (Booking)</td><td><span class="pill bad">Not built</span></td><td>Looks only, never abilities. Needs moderation, including a block on real-person likeness.</td></tr>
+      <tr><td>Auto mode, scars, chronicle</td><td><span class="pill bad">Not built</span></td><td>Hand-built playbooks are planned; no natural-language compiler.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Known limits</h3>
+  <ul>
+    <li>Gas figures are priced for a plain EVM. Monad's cold storage access is roughly four times dearer, and Monad charges the gas limit, not gas used.</li>
+    <li>The Arena is about 36.5 KB. That is fine on Monad (128 KB limit) and would not deploy on a chain with the standard 24 KB limit.</li>
+    <li>The contracts are not audited and not formally verified.</li>
+    <li>Records are unranked until blind matchmaking exists.</li>
+    <li>Full's privacy depends on unpredictable client salts. The first player to reveal with a card opening shows it before the other side decides whether to reveal. The other side can only forfeit, which is the same as in Lite.</li>
+    <li>The Lite reading-skill result is just under target, and the sample sizes behind the depth numbers are modest.</li>
+  </ul>
+
+  <h3>Run it</h3>
+  <ul>
+    <li>Engine tests: <code>pnpm --filter @sublevel/engine test</code>. Contract tests: <code>forge test</code> in <code>contracts/</code>. Chain client tests: <code>pnpm --filter @sublevel/chain test</code>.</li>
+    <li>Web client: <code>pnpm --filter web dev</code>. Add <code>?r=2d</code> for the flat view.</li>
+    <li>Deploy: <code>contracts/script/Deploy.s.sol</code> sends the single Bootstrap transaction. Use an encrypted keystore or an agent wallet session, never a pasted key.</li>
+  </ul>
+</section>
+
+<footer>
+  SUBLEVEL &middot; working title &middot; Rulebook v1 &middot; Monad testnet (chain 10143) &middot; nothing deployed yet. Source documents live in <code>docs/</code>; the rules and the depth-gate numbers are in <code>packages/engine/RULES.md</code>.
+</footer>
+</main>
+</div>
