@@ -54,7 +54,7 @@ Predictable players lose, so you have to read the other side: their Grit, their 
 - **A referee nobody has to trust.** Commit–reveal means neither player can see or change a move after sealing, and the contract resolves it. There is no server that could peek at your move or favour a side.
 - **Careers nobody can edit.** A card's wins, losses and scars are written only by the Arena, from a finished bout. There is no admin who can rewrite a record.
 - **A title nobody can quietly reassign.** The Belt moves only when the holder loses a ranked bout.
-- **No randomness and no custody.** There's no random number to game and no money held by the contracts.
+- **No randomness.** There's no random number to game. (The contracts hold no money today; a testnet entry fee and crowd pool are designed, see [below](#proposed-the-ring-fee-and-the-crowd-pool-designed-not-built).)
 
 ## The ON-CHAIN DUEL
 
@@ -70,33 +70,68 @@ Every seal and every reveal is a real transaction on Monad. **The Ledger** lists
 
 Street Aura's lesson, our way: the crowd takes part in the show but never in the result.
 
-Spectators predict what **kind** of move each fighter will play next (LIGHT, HEAVY, BRACE, SWITCH or TRICK) and score points for correct reads. Picks are **sealed** while the turn is being decided, so the fighters can't use the crowd as a hint, and they're **revealed one turn late**, then scored. The big screen shows the room's read as heat bars and a roar when most of the room called it. Only points and cosmetics are ever at stake.
+Spectators predict what **kind** of move each fighter will play next (LIGHT, HEAVY, BRACE, SWITCH or TRICK) and score points for correct reads. Picks are **sealed** while the turn is being decided, so the fighters can't use the crowd as a hint, and they're **revealed one turn late**, then scored. The big screen shows the room's read as heat bars and a roar when most of the room called it. Today only points and cosmetics are at stake, and the crowd can never change a bout.
 
 | The big screen | A spectator's phone |
 |---|---|
 | ![The room's read, revealed one turn late](docs/screenshots/03-room-projector/heat-revealed-3d.png) | ![The phone view](docs/screenshots/04-room-phone/phone-after-turn.png) |
 
-**Venue mode:** `pnpm web:demo` shows a QR code on the projector. Phones on the same network scan it, pick a name and join. No wallet needed.
+**Scan to join:** the big screen shows a QR code (large over a dimmed screen for the first seconds of a match, then docked as a small chip you can click to enlarge). Phones scan it, pick a name and join. No wallet needed. It works on the **live site** (phones connect to the projector peer-to-peer over WebRTC) and in **venue mode** (`pnpm web:demo`, a local relay).
+
+## Proposed: the ring fee and the crowd pool (designed, not built)
+
+> **Status: design only.** The deployed contracts have no `payable` function and hold no money. Nothing below is live, and nothing in the app claims it is. If built, it would be **testnet MON only** (no value); real money would need legal review first, because pooled wagering is regulated in India.
+
+**1. Pay to enter the ring.** Each fighter puts the same entry fee into the bout, and the winner takes the pot.
+
+| Event | What the Arena does with the pot (2 × fee) |
+|---|---|
+| Challenge created | The creator's fee is escrowed (`createChallenge{value: fee}`); cancelling before anyone accepts refunds it |
+| Challenge accepted | The opponent sends the same fee (`acceptChallenge{value: fee}`); the bout starts with both fees locked |
+| KO / bout won | The whole pot is credited to the winner |
+| Opponent forfeits (bad reveal or missed deadline) | The pot goes to the player who played by the rules |
+| Both miss a deadline (void) | Each gets their own fee back |
+
+Winnings are **credited, then pulled** (`withdraw()`), never pushed in the middle of resolving a turn, so a hostile receiver can't re-enter the Arena. Fixed fee tiers, no admin and no house cut, in keeping with the contracts' no-owner rule.
+
+**2. The crowd pool.** Spectators who want a stake buy into a bout's pool (a fixed entry, before turn 1). It is separate from the fighters' pot and has no way to influence the bout.
+
+- **Who:** anyone except the two fighters and their session keys.
+- **Predictions:** exactly as in The Room: per turn, one of five classes for each fighter, sealed as a hash while the turn is being decided, revealed one turn late. One transaction per spectator per turn (`reveal(t-1)` + `commit(t)`), which fits Monad's one-transaction-per-~3-blocks limit for low-balance wallets.
+- **Scoring (on chain):** +1 per correctly read fighter per turn (max 2 a turn), computed from a small per-turn action log the Arena would keep. An unrevealed prediction scores nothing.
+- **Payout:** when the bout ends, the pool is split among spectators in proportion to their points (a tie splits evenly). If nobody scored, every entry is refunded. Credited, then pulled, like the fighters' pot.
+
+```
+ fighter A fee ──┐                                   ┌──► winner (pot = 2 × fee)
+                 ├─► Arena escrow ── bout result ───┤
+ fighter B fee ──┘                                   └──► void: each fee back
+
+ spectator entries ─► Crowd pool ── final scores ───► split by points (no scorers: refund)
+        (separate from the pot; reads the Arena's action log, never writes to a bout)
+```
+
+**Known problems to solve before real use.** With value in the pool, a fighter could join as a spectator from a second wallet: they can't see the other fighter's sealed move, but they do know their own, which makes half of every read free. Entry caps per wallet and closing entries before turn 1 reduce this but don't remove it, and one person can still hold many wallets. This is why the live Room stays points-only for now.
 
 ## Try it in one minute
 
 1. Open the live app and press **LEARN TO FIGHT**: a six-turn scripted bout on the real engine, fully offline.
 2. Press **QUICK FIGHT** to spar the house bot, then open **THE TAPE** on the result screen.
 3. Press **⛓ ON-CHAIN DUEL**, fund the guest wallet from [the faucet](https://faucet.monad.xyz) and press **START THE DUEL**.
-4. Open **`/watch`** in a second window to read the fight as a spectator.
+4. Scan the QR on the big screen with your phone (or open **`/watch`** in a second window) to read the fight as a spectator.
 
 ## What is built, and what is not
 
 **Built and working**
 - **Rules engine** (`packages/engine`): pure TypeScript, integer-only, Rulebook v1; bots, a simulator and the "depth gate" that picked the rules. 54 tests and 1,541 cross-language vectors.
 - **Contracts** (`contracts/`): `Engine` (a line-for-line port of the TS rules), `Arena` (commit–reveal for Lite and Full hidden-hand bouts), `Cards`, `Armory`, `Ladder`. 63 Foundry tests, including whole bouts replayed through the contracts and checked against the TypeScript engine.
-- **The web app** (`apps/web`): the 3D tabletop with a flat fallback, the learn-to-fight tutorial, the post-bout tape, the Room (host screen and phones), the one-transaction **deploy page**, and the on-chain duel with its Ledger.
+- **The web app** (`apps/web`): the 3D tabletop with a flat fallback, the learn-to-fight tutorial, the post-bout tape, the Room (host screen and phones, with QR join on the live site), wallet sign-in and the **Belt** screen (read from the deployed Ladder), the one-transaction **deploy page**, and the on-chain duel with its Ledger.
 - **Tooling**: a client library that plays full bouts through the contracts (`packages/chain`), tested on a local chain; a script that publishes source for all five contracts through the Monad verification API.
 
 **Not built / not live (nothing here is claimed as working)**
 - The on-chain duel plays the **Lite** format against a house bot. The Full format (3v3, hidden hands) is implemented and tested in the contracts but isn't wired into the UI.
-- The **ranked queue and the Belt** are implemented and tested in the contracts; there is no UI for them yet.
+- The **ranked queue and the Belt** are implemented and tested in the contracts. The Belt screen shows them live, but both belts are vacant on testnet because the on-chain duel is unranked; there is no ranked-queue UI yet.
 - The Room's scoring runs **off-chain** in the host browser (a mock referee). An on-chain `Crowd` contract is designed but not written.
+- **Money is not built.** The **ring entry fee** (winner takes the pot) and the **crowd pool** (split by prediction points) are designed [above](#proposed-the-ring-fee-and-the-crowd-pool-designed-not-built) but not written, tested or deployed. The deployed contracts hold no funds.
 - **Auto playbooks**, AI-generated portraits (portraits are procedural), a mainnet deployment, and an audit.
 
 ## Run it yourself
@@ -131,7 +166,7 @@ cd contracts && forge test        # 63 tests
  │ guest wallet + house bot     │                   │ Armory (pools, session keys)  │
  │ THE LEDGER (tx, block, ms)   │                   │ Ladder (Elo, the Belt)        │
  └─────────────┬────────────────┘                   └───────────────────────────────┘
-               │ QR + SSE (venue mode, off-chain)
+               │ QR + WebRTC (live site) or SSE relay (venue mode), off-chain
                ▼
         spectator phones (/watch): read the fight, points only
 ```
@@ -150,7 +185,7 @@ The verified chain facts, and where each one came from, are in [`docs/TECH_ARCHI
 ## Market and revenue (an honest sketch)
 
 - **Who it's for:** crypto-native communities and events that want a live, watchable game in the room (hackathons, meetups, campus and Discord communities), and card-duel players who want provable fairness and a permanent record.
-- **What could earn:** event licensing of the Room (a host runs a projector night and the community plays); cosmetics and card art, never power; a small mint fee for custom fighters; sponsored belts and seasons. No betting and no pay-to-win. The design pillars forbid both, and wagering is a legal risk in India.
+- **What could earn:** event licensing of the Room (a host runs a projector night and the community plays); cosmetics and card art, never power; a small mint fee for custom fighters; sponsored belts and seasons. No pay-to-win ever. A testnet entry fee and crowd pool are designed (see above), but real-money wagering is a legal risk in India, so it would need legal review before any mainnet use.
 - **What we have not proven:** any of this. There are no users yet.
 
 ## Repository map and design docs
@@ -167,5 +202,3 @@ The verified chain facts, and where each one came from, are in [`docs/TECH_ARCHI
 | [`docs/VISUAL_IMMERSION.md`](docs/VISUAL_IMMERSION.md) | "The Table": layout, diegetic UI, art pipeline |
 | [`docs/PLAN.md`](docs/PLAN.md) | Phases, risks, cut list, decision log |
 | [`docs/screenshots/`](docs/screenshots/) | What every feature looks like |
-
-**Credits.** Inspired by the *spirit* of Promptmon (authorship and stakes) and Street Aura (a live, shared, block-driven room); no designs or code were copied. The fight-club aesthetic uses no film IP.
