@@ -33,4 +33,5 @@ export interface Eip1193 {
   request(args: { method: string; params?: unknown[] | object }): Promise<unknown>;
 }
 
-export const injected = (): Eip1193 | null => (typeof window === "undefined" ? null : ((window as unknown as { ethereum?: Eip1193 }).ethereum ?? null));
+// NOTE: there is deliberately no `window.ethereum` helper here. With several wallet extensions installed that slot can be a chooser proxy
+// that throws (`evmAsk … selectExtension`). Wallets are discovered per-wallet via EIP-6963 in ./wallets.ts.

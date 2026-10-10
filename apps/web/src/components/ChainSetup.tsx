@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { formatEther } from "viem";
 import { GUEST_NEEDS, useChain } from "@/lib/chainGame";
-import { addressUrl, faucetUrl, injected } from "@/lib/monad";
+import { addressUrl, faucetUrl } from "@/lib/monad";
+import { discoverWallets, type WalletInfo } from "@/lib/wallets";
 
 const mono: React.CSSProperties = { fontFamily: "var(--font-type)" };
 
@@ -25,6 +26,11 @@ export function ChainSetup() {
     fund: useChain((s) => s.fundFromWallet),
     reset: useChain((s) => s.resetGuest),
   };
+
+  const [wallets, setWallets] = useState<WalletInfo[]>([]);
+  useEffect(() => {
+    if (open) void discoverWallets().then(setWallets);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -63,11 +69,11 @@ export function ChainSetup() {
                     {mon(balance)} <span style={{ fontSize: 13, color: "#555" }}>(needs about {formatEther(GUEST_NEEDS)} MON for the house bot's float and the bout's gas)</span>
                   </div>
                   <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-                    {injected() && (
-                      <button onClick={() => void fund("3")} disabled={running} className="display" style={btn("var(--tape)", "#0b0b0c")}>
-                        SEND 3 MON FROM MY WALLET
+                    {wallets.map((w) => (
+                      <button key={w.id} onClick={() => void fund(w, "3")} disabled={running} className="display" style={btn("var(--tape)", "#0b0b0c")}>
+                        SEND 3 MON FROM {w.name.toUpperCase()}
                       </button>
-                    )}
+                    ))}
                     <a href={faucetUrl} target="_blank" rel="noreferrer" className="display" style={{ ...btn("transparent", "#0b0b0c"), border: "2px solid #0b0b0c", textDecoration: "none" }}>
                       OPEN THE FAUCET
                     </a>

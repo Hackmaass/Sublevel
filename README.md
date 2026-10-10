@@ -112,7 +112,7 @@ pnpm engine:test                  # rules engine tests
 cd contracts && forge test        # 63 tests
 ```
 
-**Deploy your own copy to Monad Testnet** (no CLI, and no key leaves your wallet): open **`/deploy`** in the running app, connect MetaMask and send the single deployment transaction. It costs about 17.7M gas; Monad charges the gas *limit*, so at the 100 gwei minimum fee that's roughly 2 MON. The page prints the five addresses. Put them into `apps/web/src/lib/deployments.ts` and the on-chain duel appears on the title screen.
+**Deploy your own copy to Monad Testnet** (no CLI, and no key leaves your wallet): open **`/deploy`** in the running app and send the single deployment transaction from any wallet extension (each installed wallet is listed separately, so having MetaMask and Phantom installed together is fine) or from the built-in **guest wallet** with no extension at all. The contracts have no admin, so whichever account deploys gains no power. Note: Phantom's own docs list no Monad network, so use MetaMask, Rabby, OKX or the guest wallet. It costs about 17.7M gas; Monad charges the gas *limit*, so at the 100 gwei minimum fee that's roughly 2 MON. The page prints the five addresses. Put them into `apps/web/src/lib/deployments.ts` and the on-chain duel appears on the title screen.
 
 **Publish the source on the explorers:** `pnpm --filter @sublevel/chain verify <bootstrapAddress>` (it reads the other four addresses from the Bootstrap contract and uses the exact compiler settings of the build).
 

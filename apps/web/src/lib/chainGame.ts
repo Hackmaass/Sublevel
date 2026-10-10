@@ -14,7 +14,8 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { Actor, TAG, houseLoop, playLead, presetName, readRevealedAction, startDuel, waitFor, type Duel, type TxLog } from "@sublevel/chain";
 import type { Action, BoutState } from "@sublevel/engine";
 import { DEPLOYMENT, type Deployment } from "./deployments";
-import { injected, monadTestnet, publicClient, rpcUrl } from "./monad";
+import { monadTestnet, publicClient, rpcUrl } from "./monad";
+import { ensureMonadTestnet, walletError, type WalletInfo } from "./wallets";
 import { useGame, type ChainDriver } from "./game";
 
 const KEY_GUEST = "sublevel.guest.key";
@@ -47,6 +48,9 @@ function loadKey(name: string): Hex {
   return k;
 }
 
+/** the browser's guest wallet key (created on first use) */
+export const getGuestKey = (): Hex => loadKey(KEY_GUEST);
+
 export function getDeployment(): Deployment | null {
   if (DEPLOYMENT) return DEPLOYMENT;
   try {
@@ -73,7 +77,7 @@ interface ChainState {
   openSetup(): void;
   closeSetup(): void;
   refresh(): Promise<void>;
-  fundFromWallet(mon: string): Promise<void>;
+  fundFromWallet(w: WalletInfo, mon: string): Promise<void>;
   resetGuest(): void;
   start(): Promise<void>;
 }
@@ -118,25 +122,19 @@ export const useChain = create<ChainState>((set, get) => ({
   },
 
   /** top the guest wallet up from the player's own wallet (one popup) */
-  async fundFromWallet(mon) {
-    const p = injected();
+  async fundFromWallet(w, mon) {
     const guest = get().guest;
-    if (!p || !guest) return set({ error: "No wallet found in this browser. Use the faucet instead (link below)." });
+    if (!guest) return;
     set({ error: null });
     try {
-      const wc = createWalletClient({ chain: monadTestnet, transport: custom(p) });
+      const wc = createWalletClient({ chain: monadTestnet, transport: custom(w.provider) });
       const [from] = await wc.requestAddresses();
-      try {
-        await wc.switchChain({ id: monadTestnet.id });
-      } catch {
-        await wc.addChain({ chain: monadTestnet });
-        await wc.switchChain({ id: monadTestnet.id });
-      }
+      await ensureMonadTestnet(w);
       const hash = await wc.sendTransaction({ account: from!, to: guest, value: parseEther(mon), gas: 21000n });
       await publicClient.waitForTransactionReceipt({ hash });
       await get().refresh();
     } catch (e) {
-      set({ error: (e as { shortMessage?: string; message?: string }).shortMessage ?? (e as Error).message });
+      set({ error: walletError(e, w) });
     }
   },
 

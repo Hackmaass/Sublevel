@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { createWalletClient, custom, encodeDeployData, formatEther, formatGwei, type Address, type Hex } from "viem";
+import { createWalletClient, custom, encodeDeployData, formatEther, formatGwei, http, type Address, type Hex } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import { bootstrapAbi, bootstrapBytecode } from "@sublevel/chain";
-import { EXPLORER, addressUrl, faucetUrl, injected, monadTestnet, publicClient, txUrl } from "@/lib/monad";
+import { EXPLORER, addressUrl, faucetUrl, monadTestnet, publicClient, rpcUrl, txUrl } from "@/lib/monad";
+import { discoverWallets, ensureMonadTestnet, rememberWallet, rememberedWallet, walletError, type WalletInfo } from "@/lib/wallets";
+import { getGuestKey } from "@/lib/chainGame";
 
 interface Result {
   chainId: 10143;
@@ -17,20 +20,20 @@ interface Result {
   deployBlock: number;
 }
 
+type Signer = { kind: "wallet"; wallet: WalletInfo; address: Address } | { kind: "guest"; address: Address };
+
 const mono: React.CSSProperties = { fontFamily: "var(--font-type)" };
 const display: React.CSSProperties = { fontFamily: "var(--font-display)", textTransform: "uppercase" };
 
-const errText = (e: unknown): string => {
-  const x = e as { shortMessage?: string; message?: string };
-  return x.shortMessage ?? x.message ?? String(e);
-};
-
 /**
- * One-transaction deploy of the whole system (Cards + Armory + Ladder + Arena, wired inside the constructor) from YOUR wallet.
- * No CLI, no key leaves the wallet: this page only asks it to sign one deployment transaction on Monad testnet.
+ * One-transaction deploy of the whole system (Cards + Armory + Ladder + Arena, wired inside the constructor).
+ * Sign with ANY wallet extension (each wallet is discovered separately, so having several installed doesn't break it) — or with the
+ * browser's guest wallet, no extension at all. The contracts have no admin, so it doesn't matter which account deploys.
+ * No private key ever leaves the wallet; the guest key lives only in this browser.
  */
 export default function Deploy() {
-  const [account, setAccount] = useState<Address | null>(null);
+  const [wallets, setWallets] = useState<WalletInfo[] | null>(null);
+  const [signer, setSigner] = useState<Signer | null>(null);
   const [balance, setBalance] = useState<bigint | null>(null);
   const [full, setFull] = useState(true);
   const [gas, setGas] = useState<bigint | null>(null);
@@ -40,8 +43,11 @@ export default function Deploy() {
   const [txHash, setTxHash] = useState<Hex | null>(null);
   const [result, setResult] = useState<Result | null>(null);
 
+  useEffect(() => {
+    void discoverWallets().then(setWallets);
+  }, []);
+
   const refresh = useCallback(async (who: Address, fullEnabled: boolean) => {
-    setError(null);
     try {
       const [bal, price] = await Promise.all([publicClient.getBalance({ address: who }), publicClient.getGasPrice()]);
       setBalance(bal);
@@ -49,46 +55,53 @@ export default function Deploy() {
       const data = encodeDeployData({ abi: bootstrapAbi, bytecode: bootstrapBytecode, args: [fullEnabled] });
       const est = await publicClient.estimateGas({ account: who, data });
       setGas(est + est / 10n); // Monad charges the gas LIMIT: keep the buffer small
+      setError(null);
     } catch (e) {
       setGas(null);
-      setError(`Could not estimate the deployment: ${errText(e)}`);
+      setError(`Could not estimate the deployment: ${(e as { shortMessage?: string; message?: string }).shortMessage ?? (e as Error).message}`);
     }
   }, []);
 
   useEffect(() => {
-    if (account) void refresh(account, full);
-  }, [account, full, refresh]);
+    if (!signer) return;
+    void refresh(signer.address, full);
+    // the guest wallet is funded from a faucet: keep its balance fresh
+    if (signer.kind !== "guest") return;
+    const id = setInterval(() => void refresh(signer.address, full), 4000);
+    return () => clearInterval(id);
+  }, [signer, full, refresh]);
 
-  const connect = async () => {
+  const connect = async (w: WalletInfo) => {
     setError(null);
-    const p = injected();
-    if (!p) return setError("No wallet found in this browser. Install MetaMask (or Rabby) and reload.");
-    setBusy("Connecting…");
+    setBusy(`Connecting ${w.name}…`);
     try {
-      const wc = createWalletClient({ chain: monadTestnet, transport: custom(p) });
+      const wc = createWalletClient({ chain: monadTestnet, transport: custom(w.provider) });
       const [addr] = await wc.requestAddresses();
-      try {
-        await wc.switchChain({ id: monadTestnet.id });
-      } catch {
-        await wc.addChain({ chain: monadTestnet });
-        await wc.switchChain({ id: monadTestnet.id });
-      }
-      setAccount(addr!);
+      await ensureMonadTestnet(w);
+      rememberWallet(w.id);
+      setSigner({ kind: "wallet", wallet: w, address: addr! });
     } catch (e) {
-      setError(errText(e));
+      setError(walletError(e, w));
     } finally {
       setBusy(null);
     }
   };
 
-  const deploy = async () => {
-    const p = injected();
-    if (!p || !account || !gas) return;
+  const useGuest = () => {
     setError(null);
-    setBusy("Confirm the deployment in your wallet…");
+    setSigner({ kind: "guest", address: privateKeyToAccount(getGuestKey()).address });
+  };
+
+  const deploy = async () => {
+    if (!signer || !gas) return;
+    setError(null);
+    setBusy(signer.kind === "guest" ? "Sending the deployment…" : "Confirm the deployment in your wallet…");
     try {
-      const wc = createWalletClient({ account, chain: monadTestnet, transport: custom(p) });
-      const hash = await wc.deployContract({ abi: bootstrapAbi, bytecode: bootstrapBytecode, args: [full], gas });
+      const wc =
+        signer.kind === "guest"
+          ? createWalletClient({ account: privateKeyToAccount(getGuestKey()), chain: monadTestnet, transport: http(rpcUrl) })
+          : createWalletClient({ account: signer.address, chain: monadTestnet, transport: custom(signer.wallet.provider) });
+      const hash = await wc.deployContract({ abi: bootstrapAbi, bytecode: bootstrapBytecode, args: [full], gas } as never);
       setTxHash(hash);
       setBusy("Deployment sent — waiting for it to land on Monad…");
       const rc = await publicClient.waitForTransactionReceipt({ hash });
@@ -104,7 +117,7 @@ export default function Deploy() {
         /* storage may be unavailable */
       }
     } catch (e) {
-      setError(errText(e));
+      setError(walletError(e, signer.kind === "wallet" ? signer.wallet : null));
     } finally {
       setBusy(null);
     }
@@ -112,32 +125,64 @@ export default function Deploy() {
 
   const cost = gas && gasPrice ? gas * gasPrice : null;
   const enough = balance !== null && cost !== null && balance > cost;
-  const snippet = result
-    ? `export const DEPLOYMENT: Deployment | null = ${JSON.stringify(result, null, 2)};`
-    : "";
+  const snippet = result ? `export const DEPLOYMENT: Deployment | null = ${JSON.stringify(result, null, 2)};` : "";
+  const remembered = rememberedWallet();
+  const hasPhantom = (wallets ?? []).some((w) => /phantom/i.test(w.name));
 
   return (
     <div style={{ position: "fixed", inset: 0, overflowY: "auto", background: "radial-gradient(ellipse at 50% -10%, #3a2f1f, #0b0b0c 60%)", color: "var(--paper)", padding: "28px 18px 60px" }}>
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
         <div style={{ ...display, fontSize: 64, lineHeight: 1 }}>DEPLOY</div>
         <div style={{ ...mono, fontSize: 15, color: "var(--smear)", marginTop: 6 }}>
-          One transaction from your wallet puts the whole game on Monad testnet: Cards, Armory, Ladder and Arena, wired inside the constructor, with no admin key left over. Nothing here ever sees a private key.
+          One transaction puts the whole game on Monad testnet: Cards, Armory, Ladder and Arena, wired inside the constructor, with no admin key left over. Nothing here ever sees a private key from your wallet.
         </div>
 
-        {/* 1 connect */}
-        <Step n={1} title="Connect your wallet" done={!!account}>
-          {account ? (
+        {/* 1 sign with */}
+        <Step n={1} title="Choose how to sign" done={!!signer}>
+          {signer ? (
             <div style={mono}>
-              {account} · <span style={{ color: "var(--ok)" }}>{balance !== null ? `${Number(formatEther(balance)).toFixed(3)} MON` : "…"}</span>
+              {signer.kind === "guest" ? "guest wallet" : signer.wallet.name} · {signer.address} ·{" "}
+              <span style={{ color: "var(--ok)" }}>{balance !== null ? `${Number(formatEther(balance)).toFixed(3)} MON` : "…"}</span>
+              {!result && !busy && (
+                <button onClick={() => { setSigner(null); setBalance(null); setGas(null); }} style={{ ...mono, marginLeft: 10, background: "none", border: "none", color: "var(--smear)", textDecoration: "underline", cursor: "pointer" }}>
+                  change
+                </button>
+              )}
             </div>
           ) : (
-            <button onClick={connect} disabled={!!busy} style={btn()}>
-              CONNECT METAMASK
-            </button>
+            <>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {wallets === null && <span style={mono}>Looking for wallets…</span>}
+                {(wallets ?? []).map((w) => (
+                  <button key={w.id} onClick={() => void connect(w)} disabled={!!busy} style={btn(!!busy)}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {w.icon && <img src={w.icon} alt="" width={26} height={26} style={{ verticalAlign: "middle", marginRight: 8, borderRadius: 5 }} />}
+                    {w.name}
+                    {remembered === w.id ? " ✓" : ""}
+                  </button>
+                ))}
+                <button onClick={useGuest} disabled={!!busy} style={{ ...btn(!!busy), background: "transparent", color: "var(--paper)", border: "2px solid rgba(245,241,230,0.5)" }}>
+                  USE A GUEST WALLET (NO EXTENSION)
+                </button>
+              </div>
+              {wallets !== null && wallets.length === 0 && <div style={{ ...mono, fontSize: 13, color: "var(--smear)", marginTop: 8 }}>No wallet extension detected in this browser. Use the guest wallet, or install MetaMask / Rabby and reload.</div>}
+              {hasPhantom && (
+                <div style={{ ...mono, fontSize: 12, color: "var(--tape)", marginTop: 8, lineHeight: 1.4 }}>
+                  Heads-up: Phantom&apos;s own docs list no Monad network, so it may refuse Monad Testnet. If it does, pick another wallet above or use the guest wallet.
+                </div>
+              )}
+              <div style={{ ...mono, fontSize: 12, color: "var(--smear)", marginTop: 8, lineHeight: 1.45 }}>
+                Each wallet is listed on its own, so having several installed (MetaMask + Phantom…) is fine. The <b>guest wallet</b> is a throw-away key kept in this browser: fund it from the{" "}
+                <a href={faucetUrl} target="_blank" rel="noreferrer" style={{ color: "var(--tape)" }}>faucet</a>, then deploy. The contracts have no admin, so whoever deploys gains no power.
+              </div>
+            </>
           )}
-          <div style={{ ...mono, fontSize: 12, color: "var(--smear)", marginTop: 6 }}>
-            Switches to Monad Testnet (chain 10143). Need test MON? <a href={faucetUrl} target="_blank" rel="noreferrer" style={{ color: "var(--tape)" }}>faucet.monad.xyz</a>
-          </div>
+          {signer?.kind === "guest" && (
+            <div style={{ ...mono, fontSize: 13, marginTop: 8, lineHeight: 1.5 }}>
+              Send testnet MON to the address above (about 3 MON), e.g. paste it into the{" "}
+              <a href={faucetUrl} target="_blank" rel="noreferrer" style={{ color: "var(--tape)" }}>faucet</a>. This page refreshes the balance by itself.
+            </div>
+          )}
         </Step>
 
         {/* 2 review */}
@@ -150,16 +195,16 @@ export default function Deploy() {
             gas limit: <b>{gas ? gas.toString() : "—"}</b> · gas price: <b>{gasPrice ? `${formatGwei(gasPrice)} gwei` : "—"}</b>
             <br />
             You pay the gas <b>limit</b> on Monad: <b style={{ color: "var(--tape)" }}>{cost ? `${Number(formatEther(cost)).toFixed(3)} MON` : "—"}</b>
-            {balance !== null && cost !== null && !enough && <span style={{ color: "var(--blood)" }}> — not enough MON in this wallet</span>}
+            {balance !== null && cost !== null && !enough && <span style={{ color: "var(--blood)" }}> — not enough MON in this account yet</span>}
           </div>
           <div style={{ ...mono, fontSize: 12, color: "var(--smear)", marginTop: 6 }}>
-            Monad rule: a wallet under 10 MON can send one transaction per ~3 blocks. If the wallet just sent something, wait a few seconds first.
+            Monad rule: an account under 10 MON can send one transaction per ~3 blocks. If it just sent something (or was just funded), wait a few seconds.
           </div>
         </Step>
 
         {/* 3 deploy */}
         <Step n={3} title="Deploy" done={!!result}>
-          <button onClick={deploy} disabled={!account || !gas || !enough || !!busy || !!result} style={btn(!account || !gas || !enough || !!busy || !!result)}>
+          <button onClick={deploy} disabled={!signer || !gas || !enough || !!busy || !!result} style={btn(!signer || !gas || !enough || !!busy || !!result)}>
             {result ? "DEPLOYED" : "DEPLOY TO MONAD TESTNET"}
           </button>
           {busy && <div style={{ ...mono, color: "var(--tape)", marginTop: 8 }}>● {busy}</div>}
@@ -170,7 +215,7 @@ export default function Deploy() {
           )}
         </Step>
 
-        {error && <div style={{ ...mono, marginTop: 14, color: "var(--blood)", border: "1px solid var(--blood)", padding: 10 }}>{error}</div>}
+        {error && <div style={{ ...mono, marginTop: 14, color: "var(--blood)", border: "1px solid var(--blood)", padding: 10, lineHeight: 1.45 }}>{error}</div>}
 
         {/* 4 result */}
         {result && (
@@ -187,7 +232,7 @@ export default function Deploy() {
               block {result.deployBlock} · explorer {EXPLORER.replace("https://", "")}
             </div>
             <textarea readOnly value={snippet} rows={14} style={{ ...mono, width: "100%", marginTop: 10, fontSize: 12, background: "#17140f", color: "var(--paper)", border: "1px solid rgba(245,241,230,0.25)", padding: 8 }} />
-            <button onClick={() => void navigator.clipboard?.writeText(snippet)} style={{ ...btn(), marginTop: 8, fontSize: 18 }}>
+            <button onClick={() => void navigator.clipboard?.writeText(snippet)} style={{ ...btn(false), marginTop: 8, fontSize: 18 }}>
               COPY
             </button>
             <div style={{ ...mono, fontSize: 13, marginTop: 10 }}>Send the <b>bootstrap</b> address (or the tx hash) back to the developer: everything else is read from chain.</div>
@@ -210,5 +255,5 @@ function Step({ n, title, done, children }: { n: number; title: string; done?: b
 }
 
 function btn(disabled = false): React.CSSProperties {
-  return { ...display, fontSize: 26, padding: "10px 24px", border: "none", cursor: disabled ? "not-allowed" : "pointer", background: disabled ? "#2a2a2d" : "var(--tape)", color: disabled ? "#6b6b6e" : "#0b0b0c" };
+  return { ...display, fontSize: 22, padding: "10px 20px", border: "none", cursor: disabled ? "not-allowed" : "pointer", background: disabled ? "#2a2a2d" : "var(--tape)", color: disabled ? "#6b6b6e" : "#0b0b0c" };
 }
