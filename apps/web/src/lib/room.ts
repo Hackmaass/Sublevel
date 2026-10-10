@@ -75,6 +75,9 @@ interface RoomState {
   roar: Roar | null;
   /** id → points earned at the last reveal (lets a phone show "you read 1 of 2") */
   lastResults: Record<string, number>;
+  /** house bots fill the room with fake readers; OFF by default so the room is real phones only */
+  bots: boolean;
+  toggleBots(): void;
   toggle(): void;
   join(id: string, name: string): void;
   /** a human spectator's pick; false if the window is shut, the turn is stale or they already locked */
@@ -109,7 +112,8 @@ function botPick(skill: Skill, before: BoutState): Prediction {
 
 export const useRoom = create<RoomState>((set, get) => ({
   on: true,
-  spectators: makeBots(),
+  bots: false,
+  spectators: [],
   windowOpen: false,
   code: "",
   relay: "unknown",
@@ -122,6 +126,14 @@ export const useRoom = create<RoomState>((set, get) => ({
   roar: null,
   lastResults: {},
   toggle: () => set((s) => ({ on: !s.on })),
+  toggleBots: () => {
+    if (get().bots) {
+      set((s) => ({ bots: false, spectators: s.spectators.filter((x) => x.human) }));
+      // a bot that already sealed a pick for the open window must not count once it has left
+      for (const bucket of sealed.values()) for (const id of [...bucket.keys()]) if (id.startsWith("bot:")) bucket.delete(id);
+      set((s) => ({ locked: sealed.get(s.windowTurn)?.size ?? 0 }));
+    } else set((s) => ({ bots: true, spectators: [...makeBots(), ...s.spectators] }));
+  },
   join(id, name) {
     if (get().spectators.some((s) => s.id === id)) {
       set((s) => ({ spectators: s.spectators.map((x) => (x.id === id ? { ...x, name } : x)) }));
@@ -200,7 +212,7 @@ function revealUpTo(upTo: number) {
     }));
     for (const side of [0, 1] as const) {
       const pct = roomAccuracy(heat[side]!, actual[side]!);
-      if (pct >= 0.6) {
+      if (pct >= 0.6 && bucket.size >= 3) { // a roar needs a room: not one or two readers
         useRoom.setState({ roar: { id: roarId++, side, pct } });
         break;
       }

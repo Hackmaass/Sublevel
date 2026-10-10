@@ -36,6 +36,8 @@ export function Match() {
   }, [vp?.coarse]);
   const roomOn = useRoom((s) => s.on);
   const toggleRoom = useRoom((s) => s.toggle);
+  const roomBots = useRoom((s) => s.bots);
+  const toggleBots = useRoom((s) => s.toggleBots);
 
   const toggleQr = useRoom((s) => s.toggleQr);
 
@@ -77,7 +79,7 @@ export function Match() {
       <div style={{ position: "absolute", left: 20, bottom: 12, zIndex: 60, display: "flex", gap: 8 }}>
         {[
           { label: "? rules", on: () => useGame.getState().openManual() },
-          ...(tutorial ? [] : [{ label: roomOn ? "room: on" : "room: off", on: toggleRoom }, { label: "qr", on: toggleQr }]),
+          ...(tutorial ? [] : [{ label: roomOn ? "room: on" : "room: off", on: toggleRoom }, { label: roomBots ? "house bots: on" : "house bots: off", on: toggleBots }, { label: "qr", on: toggleQr }]),
           { label: "← exit", on: goTitle },
           { label: muted ? "sound off" : "sound on", on: toggleMute },
           { label: reduce ? "motion: reduced" : "motion: full", on: toggleReduce },

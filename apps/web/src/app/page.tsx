@@ -19,7 +19,9 @@ export default function Home() {
   const screen = useGame((s) => s.screen);
   // the room (mock backend + relay) watches the game and answers spectator phones; it can never act on a bout
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("room") === "0") useRoom.setState({ on: false });
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("room") === "0") useRoom.setState({ on: false });
+    if (q.get("bots") === "1" && !useRoom.getState().bots) useRoom.getState().toggleBots(); // ?bots=1: fill the room with house bots (demo/testing)
     const dep = getDeployment();
     if (dep) useChain.setState({ deployment: dep }); // the on-chain duel appears only once the contracts exist
     useAccount.getState().hydrate(); // the signed-in wallet (browser-only storage)

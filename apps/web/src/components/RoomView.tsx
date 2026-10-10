@@ -28,6 +28,7 @@ export function RoomView() {
   const spectators = useRoom((s) => s.spectators);
   const turns = useRoom((s) => s.turns);
   const roar = useRoom((s) => s.roar);
+  const bots = useRoom((s) => s.bots);
   const meta = useGame((s) => s.meta);
   const bout = useGame((s) => s.bout);
   const code = useRoom((s) => s.code);
@@ -117,13 +118,13 @@ export function RoomView() {
         )}
         <div>
           <div className="stencil" style={{ fontSize: 13, letterSpacing: "0.22em", color: "var(--smear)" }}>
-            {house} HOUSE · {phones} {phones === 1 ? "PHONE" : "PHONES"}
+            {bots ? `${house} HOUSE BOTS · ` : ""}{phones} {phones === 1 ? "PHONE" : "PHONES"}
           </div>
           <div className="typewriter" style={{ fontSize: 14, marginTop: 4, color: open ? "var(--tape)" : "var(--smear)" }}>
-            {open ? `● ${locked}/${spectators.length} locked` : "○ window shut"}
+            {spectators.length === 0 ? "○ waiting for phones" : open ? `● ${locked}/${spectators.length} locked` : "○ window shut"}
           </div>
           <div className="typewriter" style={{ fontSize: 12, marginTop: 6, color: "var(--smear)", lineHeight: 1.3 }}>
-            house readers are bots. phones: join code <span style={{ color: "var(--paper)" }}>{code || "…"}</span>
+            {bots ? "house bots fill the room. " : "real phones only. "}join code <span style={{ color: "var(--paper)" }}>{code || "…"}</span>
             {chipQr ? " · click the QR" : ""}
           </div>
         </div>
@@ -134,6 +135,11 @@ export function RoomView() {
         <div className="stencil" style={{ fontSize: 13, letterSpacing: "0.22em", color: "var(--smear)", marginBottom: 4 }}>
           BEST READERS
         </div>
+        {board.length === 0 && (
+          <div className="typewriter" style={{ fontSize: 13, color: "var(--smear)", lineHeight: 1.35, maxWidth: 260 }}>
+            No readers yet. Scan the QR to be the first.
+          </div>
+        )}
         {board.map((sp, i) => (
           <div key={sp.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 14, height: 22, color: sp.human ? "var(--tape)" : "var(--paper)" }} className="typewriter">
             <span>
