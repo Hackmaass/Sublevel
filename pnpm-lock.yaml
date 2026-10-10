@@ -192,6 +192,9 @@ importers:
       '@react-three/postprocessing':
         specifier: ^3.1.3
         version: 3.1.3(@react-three/fiber@9.8.1(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(three@0.186.1))(@types/three@0.186.0)(postprocessing@6.39.5(three@0.186.1))(react@19.3.0)(three@0.186.1)
+      '@sublevel/chain':
+        specifier: workspace:*
+        version: link:../../packages/chain
       '@sublevel/engine':
         specifier: workspace:*
         version: link:../../packages/engine
@@ -216,6 +219,9 @@ importers:
       three:
         specifier: ^0.186.1
         version: 0.186.1
+      viem:
+        specifier: ^2.57.4
+        version: 2.57.4(typescript@5.9.3)(zod@4.6.5)
       zustand:
         specifier: ^5.0.15
         version: 5.0.15(@types/react@19.3.0)(react@19.3.0)(use-sync-external-store@1.7.0(react@19.3.0))
